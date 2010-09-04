@@ -3,6 +3,8 @@ import qualified Test.HUnit as Unit
 import Test.HUnit ((~:), (~=?))
 import Text.Printf
 import Data.ASN1.Raw
+import Data.ASN1.DER (ASN1(..))
+import qualified Data.ASN1.DER as DER
 import Data.Binary.Get
 import Data.Binary.Put
 import Data.Word
@@ -21,13 +23,27 @@ instance Arbitrary Value where
 		]
 	coarbitrary (Value _ tn _) = variant tn
 
+instance Arbitrary ASN1 where
+	arbitrary = elements (
+		[ Boolean False, Boolean True ] ++
+		map IntVal ([0..512] ++ [10241024..10242048]) ++
+		map OID [ [8,1,2], [34,42,53], [ 42, 840, 24042, 530, 530], [ 84, 249, 59342, 53295392, 325993252935] ]
+		)
+
+
 getVal = either (const (Value Application (-1) (Constructed []))) id . runGetErr getValue
 putVal = runPut . putValue
 
-prop_getput_id :: Value -> Bool
-prop_getput_id v = (getVal . putVal) v == v
+prop_getput_value_id :: Value -> Bool
+prop_getput_value_id v = (getVal . putVal) v == v
 
-tests = [ ("get.put value/id", test prop_getput_id) ]
+prop_getput_asn1_id :: ASN1 -> Bool
+prop_getput_asn1_id v = (DER.decodeASN1 . DER.encodeASN1) v == Right v
+
+tests =
+	[ ("get.put value/id", test prop_getput_value_id)
+	, ("get.put DER.ASN1/id", test prop_getput_asn1_id)
+	]
 
 quickCheckMain = mapM_ (\(s,a) -> printf "%-25s: " s >> a) tests
 
