@@ -245,6 +245,9 @@ putOID oids = Primitive $ B.pack $ eoid
 	where
 		(oid1:oid2:suboids) = oids
 		eoidclass           = fromIntegral (oid1 * 40 + oid2)
-		ungroupSubOID d     = if d < 0x80 then [ fromIntegral d ] else fromIntegral (d .&. 0x7f) : ungroupSubOID (d `shiftR` 7)
-		subeoids            = concatMap (reverse . ungroupSubOID) suboids
+		ungroupSubOID x     = unfoldr (\i -> if i == 0 then Nothing else Just (fromIntegral (i .&. 0x7f), i `shiftR` 7)) x
+		setHighBits []      = []
+		setHighBits [x]     = [x]
+		setHighBits (x:xs)  = setBit x 7 : setHighBits xs
+		subeoids            = concatMap (setHighBits . reverse . ungroupSubOID) suboids
 		eoid                = eoidclass : subeoids
