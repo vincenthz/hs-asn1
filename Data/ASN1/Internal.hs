@@ -32,7 +32,7 @@ intOfBytes b
 {- | bytesOfInt convert an integer into a two's completemented list of bytes -}
 bytesOfInt :: Integer -> [Word8]
 bytesOfInt i
-	| i > 0      = if isNeg then 0 : uints else uints
+	| i > 0      = ints
 	| i == 0     = [0]
 	| otherwise  = reverse $ plusOne $ reverse $ map complement $ ints
 	where
