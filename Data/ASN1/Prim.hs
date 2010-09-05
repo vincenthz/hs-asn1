@@ -94,7 +94,17 @@ getBoolean isDer s =
 
 {- | getInteger, parse a value bytestring and get the integer out of the two complement encoded bytes -}
 getInteger :: ByteString -> Either ASN1Err ASN1
-getInteger s = Right $ IntVal $ snd $ intOfBytes s
+getInteger s
+	| B.length s == 0 = Left $ ASN1Misc "integer: null encoding"
+	| B.length s == 1 = Right $ IntVal $ snd $ intOfBytes s
+	| otherwise       =
+		if (v1 == 0xff && testBit v2 7) || (v1 == 0x0 && (not $ testBit v2 7))
+			then Left $ ASN1Misc "integer: not shortest encoding"
+			else Right $ IntVal $ snd $ intOfBytes s
+		where
+			v1 = s `B.index` 0
+			v2 = s `B.index` 1
+
 
 getBitString :: ValStruct -> Either ASN1Err ASN1
 getBitString (Primitive s) =
