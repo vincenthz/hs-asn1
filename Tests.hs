@@ -15,6 +15,15 @@ mkSeq l = Value Universal 0x10 (Constructed l)
 mkBool t = Value Universal 0x1 (Primitive $ B.pack [ if t then 0x1 else 0x0 ])
 mkInt t = Value Universal 0x2 (Primitive $ B.pack [ t ])
 
+famous_oids :: [[Integer]]
+famous_oids =
+	[ [2,1,2]
+	, [1,38,53]
+	, [2,24,840,24042,530,530]
+	, [0,20,84,249,59342,53295392,325993252935]
+	, [1,2,840,113549,1,1,1]
+	]
+
 instance Arbitrary Value where
 	arbitrary = elements [
 		mkSeq [],
@@ -25,14 +34,16 @@ instance Arbitrary Value where
 
 instance Arbitrary ASN1 where
 	arbitrary = elements (
-		[ Boolean False, Boolean True, Null, EOC ] ++
-		map IntVal ([0..512] ++ [10241024..10242048]) ++
-		map OID [ [2,1,2], [1,38,53], [2,24,840,24042,530,530], [0,20,84,249,59342,53295392,325993252935] ]
+		   [Boolean False,Boolean True,Null,EOC]
+		++ map IntVal ([0..512] ++ [10241024..10242048])
+		++ map OID famous_oids
 		)
 
 
 getVal = either (const (Value Application (-1) (Constructed []))) id . runGetErr getValue
 putVal = runPut . putValue
+
+decodeASN1 = either (const EOC) id . DER.decodeASN1
 
 prop_getput_value_id :: Value -> Bool
 prop_getput_value_id v = (getVal . putVal) v == v
@@ -48,16 +59,22 @@ tests =
 quickCheckMain = mapM_ (\(s,a) -> printf "%-25s: " s >> a) tests
 
 
-units :: [ (String, Value, [Word8]) ]
-units = [
+value_units :: [ (String, Value, [Word8]) ]
+value_units = [
 	("empty Sequence", mkSeq [], [ 0x30, 0x0 ]),
 	("long Sequence", mkSeq (replicate 50 (mkBool True)), [ 0x30, 0x81, 150 ] ++ (concat $ replicate 50 [ 0x01, 0x1, 0x1 ]))
 	]
 
+asn1_units :: [ (String, ASN1) ]
+asn1_units =
+	map (\oid -> ("OID " ++ show oid, OID oid)) famous_oids ++
+	[]
+
 utests :: [Unit.Test]
 utests =
-	map (\ (s, v, r) -> ("put " ++ s) ~: s ~: r ~=? (L.unpack $ putVal v)) units ++
-	map (\ (s, v, r) -> ("get " ++ s) ~: s ~: v ~=? (getVal $ L.pack r)) units
+	map (\ (s, v, r) -> ("put " ++ s) ~: s ~: r ~=? (L.unpack $ putVal v)) value_units ++
+	map (\ (s, v, r) -> ("get " ++ s) ~: s ~: v ~=? (getVal $ L.pack r)) value_units ++
+	map (\ (s, v) -> ("decode/encode=id") ~: s ~: v ~=? (decodeASN1 . DER.encodeASN1) v) asn1_units
 
 main = do
 	Unit.runTestTT (Unit.TestList utests)
