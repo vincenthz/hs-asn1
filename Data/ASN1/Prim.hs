@@ -239,6 +239,7 @@ putBitString i bits = Primitive $ B.concat $ B.singleton (fromIntegral i) : L.to
 putString :: L.ByteString -> ValStruct
 putString l = Primitive $ B.concat $ L.toChunks l
 
+{- no enforce check that we oid1 is between [0..2] and oid2 is between [0..39] -}
 putOID :: [Integer] -> ValStruct
 putOID oids = Primitive $ B.pack $ eoid
 	where
