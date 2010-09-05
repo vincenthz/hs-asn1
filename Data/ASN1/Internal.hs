@@ -16,7 +16,9 @@ uintOfBytes b = (B.length b, B.foldl (\acc n -> (acc `shiftL` 8) + fromIntegral 
 
 --bytesOfUInt i = B.unfoldr (\x -> if x == 0 then Nothing else Just (fromIntegral (x .&. 0xff), x `shiftR` 8)) i
 bytesOfUInt :: Integer -> [Word8]
-bytesOfUInt i = if i <= 0xff then [fromIntegral i] else (fromIntegral i .&. 0xff) : bytesOfUInt (i `shiftR` 8)
+bytesOfUInt x = reverse (list x)
+	where
+		list i = if i <= 0xff then [fromIntegral i] else (fromIntegral i .&. 0xff) : list (i `shiftR` 8)
 
 {- | intOfBytes returns the number of bytes in the list and
    the represented integer by a two's completement list of bytes -}
