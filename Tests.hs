@@ -25,9 +25,9 @@ instance Arbitrary Value where
 
 instance Arbitrary ASN1 where
 	arbitrary = elements (
-		[ Boolean False, Boolean True ] ++
+		[ Boolean False, Boolean True, Null, EOC ] ++
 		map IntVal ([0..512] ++ [10241024..10242048]) ++
-		map OID [ [8,1,2], [34,42,53], [ 42, 840, 24042, 530, 530], [ 84, 249, 59342, 53295392, 325993252935] ]
+		map OID [ [2,1,2], [1,38,53], [2,24,840,24042,530,530], [0,20,84,249,59342,53295392,325993252935] ]
 		)
 
 
