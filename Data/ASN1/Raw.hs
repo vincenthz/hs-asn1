@@ -43,9 +43,9 @@ data TagClass =
 	deriving (Show, Eq)
 
 data ValLength =
-	  LenShort Int      -- | Short form with only one byte. length has to be < 127.
-	| LenLong Int Int   -- | Long form of N bytes
-	| LenIndefinite     -- | Length is indefinite expect an EOC in the stream to finish the type
+	  LenShort Int      -- ^ Short form with only one byte. length has to be < 127.
+	| LenLong Int Int   -- ^ Long form of N bytes
+	| LenIndefinite     -- ^ Length is indefinite expect an EOC in the stream to finish the type
 	deriving (Show, Eq)
 
 type TagNumber = Int
@@ -53,8 +53,8 @@ type TagConstructed = Bool
 type Identifier = (TagClass, TagConstructed, TagNumber)
 
 data ValStruct =
-	  Primitive ByteString -- | Primitive of a strict value
-	| Constructed [Value]  -- | Constructed of a list of values
+	  Primitive ByteString -- ^ Primitive of a strict value
+	| Constructed [Value]  -- ^ Constructed of a list of values
 	deriving (Show, Eq)
 
 data Value = Value TagClass TagNumber ValStruct

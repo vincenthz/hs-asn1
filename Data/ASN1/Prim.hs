@@ -9,10 +9,10 @@
 --
 
 module Data.ASN1.Prim (
-	-- | ASN1 high level algebraic type
+	-- * ASN1 high level algebraic type
 	ASN1(..),
 
-	-- | marshall an ASN1 type from a val struct or a bytestring
+	-- * marshall an ASN1 type from a val struct or a bytestring
 	getEOC,
 	getBoolean,
 	getInteger,
@@ -29,7 +29,7 @@ module Data.ASN1.Prim (
 	getUTCTime,
 	getGeneralizedTime,
 
-	-- | marshall an ASN1 type to a bytestring
+	-- * marshall an ASN1 type to a bytestring
 	putUTCTime,
 	putGeneralizedTime,
 	putInteger,
