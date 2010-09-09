@@ -232,7 +232,7 @@ getValueCheck check = do
 
 	struct <- case vallen of
 		LenIndefinite -> do
-			when (not pc) $ throwError $ ASN1Misc "lenght indefinite not allowed with primitive"
+			unless pc $ throwError $ ASN1Misc "lenght indefinite not allowed with primitive"
 			vs <- getValueConstructedUntilEOC check
 			return $ Constructed vs
 		(LenShort len)  -> getValueOfLength check len pc
