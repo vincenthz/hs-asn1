@@ -95,7 +95,7 @@ toRaw (UniversalString b)    = Value Universal 0x1c (putString b)
 toRaw (Other tc tn c)        = Value tc tn (either Primitive (Constructed . map toRaw) c)
 
 decodeASN1Get :: Get (Either ASN1Err ASN1)
-decodeASN1Get = runGetErrInGet getValue >>= return . either Left ofRaw
+decodeASN1Get = either Left ofRaw `fmap` runGetErrInGet getValue
 
 decodeASN1 :: L.ByteString -> Either ASN1Err ASN1
 decodeASN1 = either Left ofRaw . runGetErr getValue
