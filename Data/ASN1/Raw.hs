@@ -212,11 +212,13 @@ getValueConstructedUntilEOC check = do
 getValueOfLength :: CheckFn -> Int -> Bool -> GetErr ValStruct
 getValueOfLength check len pc = do
 	b <- geteBytes len
-	case pc of
-		True  -> case runGetErr (getValueConstructed check) (L.fromChunks [b]) of
+	if pc
+		then
+			case runGetErr (getValueConstructed check) (L.fromChunks [b]) of
 				Right x  -> return $ Constructed x
 				Left err -> throwError err
-		False -> return $ Primitive b
+		else
+			return $ Primitive b
 
 {- | getValueCheck decode an ASN1 value and check the values received through the check fn -}
 getValueCheck :: CheckFn -> GetErr Value
