@@ -98,10 +98,10 @@ decodeASN1Get :: Get (Either ASN1Err ASN1)
 decodeASN1Get = runGetErrInGet getValue >>= return . either Left ofRaw
 
 decodeASN1 :: L.ByteString -> Either ASN1Err ASN1
-decodeASN1 b = either Left ofRaw $ runGetErr getValue b
+decodeASN1 = either Left ofRaw . runGetErr getValue
 
 encodeASN1Put :: ASN1 -> Put
-encodeASN1Put d = putValue $ toRaw d
+encodeASN1Put = putValue . toRaw
 
 encodeASN1 :: ASN1 -> L.ByteString
 encodeASN1 = runPut . encodeASN1Put
