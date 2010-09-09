@@ -81,7 +81,7 @@ instance Functor GetErr where
 	fmap f = GE . fmap f . runGE
 
 runGetErr :: GetErr a -> L.ByteString -> Either ASN1Err a
-runGetErr f b = runGet (runErrorT (runGE f)) b
+runGetErr = runGet . runErrorT . runGE
 
 runGetErrInGet :: GetErr a -> Get (Either ASN1Err a)
 runGetErrInGet f = runErrorT (runGE f)
