@@ -110,7 +110,7 @@ getTagNumberLong nz = do
 
 {- marshall helper for putIdentifier to serialize long tag number -}
 putTagNumberLong :: TagNumber -> Put
-putTagNumberLong i = do
+putTagNumberLong i =
 	if i > 0x7f
 		then do
 			putWord8 $ fromIntegral (0x80 .|. (i .&. 0x7f))
