@@ -147,7 +147,7 @@ putIdentifier (cl, pc, val) = do
 	let pcval = if pc then 0x20 else 0x00
 	if val < 0x1f
 		then
-			putWord8 $ fromIntegral $ (cli `shiftL` 7) .|. pcval .|. (val)
+			putWord8 $ fromIntegral $ (cli `shiftL` 7) .|. pcval .|. val
 		else do
 			putWord8 $ fromIntegral $ (cli `shiftL` 7) .|. pcval .|. 0x1f
 			putTagNumberLong val
