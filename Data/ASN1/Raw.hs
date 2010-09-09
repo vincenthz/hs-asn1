@@ -84,7 +84,7 @@ runGetErr :: GetErr a -> L.ByteString -> Either ASN1Err a
 runGetErr = runGet . runErrorT . runGE
 
 runGetErrInGet :: GetErr a -> Get (Either ASN1Err a)
-runGetErrInGet f = runErrorT (runGE f)
+runGetErrInGet = runErrorT . runGE
 
 liftGet :: Get a -> GetErr a
 liftGet = GE . lift
