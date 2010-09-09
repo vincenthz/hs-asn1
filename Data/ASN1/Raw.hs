@@ -161,7 +161,7 @@ getLength :: GetErr ValLength
 getLength = do
 	l1 <- geteWord8
 	if testBit l1 7
-		then do
+		then
 			case fromIntegral (clearBit l1 7) of
 				0   -> return LenIndefinite
 				len -> do
@@ -213,8 +213,7 @@ getValueOfLength :: CheckFn -> Int -> Bool -> GetErr ValStruct
 getValueOfLength check len pc = do
 	b <- geteBytes len
 	case pc of
-		True  -> do
-			case runGetErr (getValueConstructed check) (L.fromChunks [b]) of
+		True  -> case runGetErr (getValueConstructed check) (L.fromChunks [b]) of
 				Right x  -> return $ Constructed x
 				Left err -> throwError err
 		False -> return $ Primitive b
