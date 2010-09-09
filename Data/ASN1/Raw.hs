@@ -134,7 +134,7 @@ getIdentifier = do
 	let pc = (w .&. 0x20) > 0
 	let val = fromIntegral (w .&. 0x1f)
 	vencoded <- if val < 0x1f then return val else getTagNumberLong True
-	return $ (cl, pc, vencoded)
+	return (cl, pc, vencoded)
 
 {- | putIdentifier encode an ASN1 Identifier into a marshalled value -}
 putIdentifier :: Identifier -> Put
@@ -189,7 +189,7 @@ putLength (LenIndefinite) = putWord8 0x80
 {- helper to getValue to build a constructed list of values when length is known -}
 getValueConstructed :: CheckFn -> GetErr [Value]
 getValueConstructed check = do
-	remain <- liftGet $ remaining
+	remain <- liftGet remaining
 	if remain > 0
 		then do
 			o <- getValueCheck check
