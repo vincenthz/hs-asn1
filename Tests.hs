@@ -10,72 +10,106 @@ import Data.Binary.Put
 import Data.Word
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as L
+import Control.Monad
+import System.IO
 
-mkSeq l = Value Universal 0x10 (Constructed l)
-mkBool t = Value Universal 0x1 (Primitive $ B.pack [ if t then 0x1 else 0x0 ])
-mkInt t = Value Universal 0x2 (Primitive $ B.pack [ t ])
+arbitraryOID :: Gen [Integer]
+arbitraryOID = do
+	i1  <- choose (0,2) :: Gen Integer
+	i2  <- choose (0,39) :: Gen Integer
+	ran <- choose (0,30) :: Gen Int
+	l   <- replicateM ran (suchThat arbitrary (\i -> i > 0))
+	return (i1:i2:l)
 
-famous_oids :: [[Integer]]
-famous_oids =
-	[ [2,1,2]
-	, [1,38,53]
-	, [2,24,840,24042,530,530]
-	, [0,20,84,249,59342,53295392,325993252935]
-	, [1,2,840,113549,1,1,1]
-	]
+instance Arbitrary B.ByteString where
+	arbitrary = do
+		len <- choose (0, 529) :: Gen Int
+		ws <- replicateM len (choose (0, 255) :: Gen Int)
+		return $ B.pack $ map fromIntegral ws
+
+instance Arbitrary L.ByteString where
+	arbitrary = do
+		len <- choose (0, 529) :: Gen Int
+		ws <- replicateM len (choose (0, 255) :: Gen Int)
+		return $ L.pack $ map fromIntegral ws
+
+instance Arbitrary TagClass where
+	arbitrary = elements [ Universal, Application, Context, Private ]
+
+arbitraryValueList = choose (0,20) >>= \len -> replicateM len (suchThat arbitrary (not . isConstructed))
+	where
+		isConstructed (Value _ _ (Constructed _)) = True
+		isConstructed _                           = False
+
+instance Arbitrary ValStruct where
+	arbitrary = oneof
+		[ liftM Primitive arbitrary
+		, liftM Constructed arbitraryValueList ]
 
 instance Arbitrary Value where
-	arbitrary = elements [
-		mkSeq [],
-		mkSeq [ mkBool True, mkInt 124 ],
-		mkSeq [ mkSeq [ mkBool True, mkInt 124 ], mkSeq [] ]
-		]
-	coarbitrary (Value _ tn _) = variant tn
+	arbitrary = liftM3 Value arbitrary (suchThat arbitrary (\i -> i > 0)) arbitrary
+
+arbitraryTime = do
+	y <- choose (1950, 2050)
+	m <- choose (0, 11)
+	d <- choose (0, 31)
+	h <- choose (0, 23)
+	mi <- choose (0, 59)
+	se <- choose (0, 59)
+	z <- arbitrary
+	return (y,m,d,h,mi,se,z)
+
+arbitraryListASN1 = choose (0, 20) >>= \len -> replicateM len (suchThat arbitrary (not . aList))
+	where
+		aList (Set _)      = True
+		aList (Sequence _) = True
+		aList _            = False
 
 instance Arbitrary ASN1 where
-	arbitrary = elements (
-		   [Boolean False,Boolean True,Null,EOC]
-		++ map IntVal ([0..512] ++ [10241024..10242048])
-		++ map OID famous_oids
-		)
+	arbitrary = oneof
+		[ return EOC
+		, liftM Boolean arbitrary
+		, liftM IntVal arbitrary
+		, liftM2 BitString (choose (0,7)) arbitrary
+		, liftM OctetString arbitrary
+		, return Null
+		, liftM OID arbitraryOID
+		--, Real Double
+		-- , return Enumerated
+		, liftM UTF8String arbitrary
+		, liftM Sequence arbitraryListASN1
+		, liftM Set arbitraryListASN1
+		, liftM NumericString arbitrary
+		, liftM PrintableString arbitrary
+		, liftM T61String arbitrary
+		, liftM VideoTexString arbitrary
+		, liftM IA5String arbitrary
+		, liftM UTCTime arbitraryTime
+		, liftM GeneralizedTime arbitraryTime
+		, liftM GraphicString arbitrary
+		, liftM VisibleString arbitrary
+		, liftM GeneralString arbitrary
+		, liftM UniversalString arbitrary
+		]
 
+prop_value_marshalling_id :: Value -> Bool
+prop_value_marshalling_id v = (getVal . putVal) v == Right v
+	where
+		getVal = runGetErr getValue
+		putVal = runPut . putValue
 
-getVal = either (const (Value Application (-1) (Constructed []))) id . runGetErr getValue
-putVal = runPut . putValue
+prop_asn1_marshalling_id :: ASN1 -> Bool
+prop_asn1_marshalling_id v = (DER.decodeASN1 . DER.encodeASN1) v == Right v
 
-decodeASN1 = either (const EOC) id . DER.decodeASN1
+args = Args
+	{ replay     = Nothing
+	, maxSuccess = 500
+	, maxDiscard = 2000
+	, maxSize    = 500
+	}
 
-prop_getput_value_id :: Value -> Bool
-prop_getput_value_id v = (getVal . putVal) v == v
-
-prop_getput_asn1_id :: ASN1 -> Bool
-prop_getput_asn1_id v = (DER.decodeASN1 . DER.encodeASN1) v == Right v
-
-tests =
-	[ ("get.put value/id", test prop_getput_value_id)
-	, ("get.put DER.ASN1/id", test prop_getput_asn1_id)
-	]
-
-quickCheckMain = mapM_ (\(s,a) -> printf "%-25s: " s >> a) tests
-
-
-value_units :: [ (String, Value, [Word8]) ]
-value_units = [
-	("empty Sequence", mkSeq [], [ 0x30, 0x0 ]),
-	("long Sequence", mkSeq (replicate 50 (mkBool True)), [ 0x30, 0x81, 150 ] ++ (concat $ replicate 50 [ 0x01, 0x1, 0x1 ]))
-	]
-
-asn1_units :: [ (String, ASN1) ]
-asn1_units =
-	map (\oid -> ("OID " ++ show oid, OID oid)) famous_oids ++
-	[]
-
-utests :: [Unit.Test]
-utests =
-	map (\ (s, v, r) -> ("put " ++ s) ~: s ~: r ~=? (L.unpack $ putVal v)) value_units ++
-	map (\ (s, v, r) -> ("get " ++ s) ~: s ~: v ~=? (getVal $ L.pack r)) value_units ++
-	map (\ (s, v) -> ("decode/encode=id") ~: s ~: v ~=? (decodeASN1 . DER.encodeASN1) v) asn1_units
+run_test n t = putStr ("  " ++ n ++ " ... ") >> hFlush stdout >> quickCheckWith args t
 
 main = do
-	Unit.runTestTT (Unit.TestList utests)
-	quickCheckMain
+	run_test "marshalling value = id" prop_value_marshalling_id
+	run_test "marshalling asn1 = id" prop_asn1_marshalling_id
