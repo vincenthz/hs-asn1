@@ -125,7 +125,7 @@ getIdentifier :: GetErr Identifier
 getIdentifier = do
 	w <- geteWord8
 	let cl =
-		case (w `shiftR` 7) .&. 3 of
+		case (w `shiftR` 6) .&. 3 of
 			0 -> Universal
 			1 -> Application 
 			2 -> Context
@@ -147,9 +147,9 @@ putIdentifier (cl, pc, val) = do
 	let pcval = if pc then 0x20 else 0x00
 	if val < 0x1f
 		then
-			putWord8 $ fromIntegral $ (cli `shiftL` 7) .|. pcval .|. val
+			putWord8 $ fromIntegral $ (cli `shiftL` 6) .|. pcval .|. val
 		else do
-			putWord8 $ fromIntegral $ (cli `shiftL` 7) .|. pcval .|. 0x1f
+			putWord8 $ fromIntegral $ (cli `shiftL` 6) .|. pcval .|. 0x1f
 			putTagNumberLong val
 
 {- | getLength get the ASN1 encoded length of an item.
