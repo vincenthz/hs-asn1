@@ -96,27 +96,27 @@ geteBytes :: Int -> GetErr ByteString
 geteBytes = liftGet . getBytes
 
 {- marshall helper for getIdentifier to unserialize long tag number -}
-getTagNumberLong :: Bool -> GetErr TagNumber
-getTagNumberLong nz = do
-	t <- geteWord8
-	let tval = fromIntegral (t .&. 0x7f)
-	when (nz && tval == 0) $ error "long tag encoding failure: first value is 0"
-	if (t .&. 0x80) > 0
-		then do
-			trest <- getTagNumberLong False
-			return ((tval `shiftL` 7) + trest)
-		else
-			return tval
+getTagNumberLong :: GetErr TagNumber
+getTagNumberLong = getNext 0 True
+	where getNext n nz = do
+		t <- fromIntegral `fmap` geteWord8
+		when (nz && t == 0x80) $ throwError ASN1LengthDecodingLongContainsZero
+		if testBit t 7
+			then getNext (n `shiftL` 7 + clearBit t 7) False
+			else return (n `shiftL` 7 + t)
 
 {- marshall helper for putIdentifier to serialize long tag number -}
 putTagNumberLong :: TagNumber -> Put
-putTagNumberLong i =
-	if i > 0x7f
-		then do
-			putWord8 $ fromIntegral (0x80 .|. (i .&. 0x7f))
-			putTagNumberLong (i `shiftR` 7)
-		else
-			putWord8 $ fromIntegral (i .&. 0x7f)
+putTagNumberLong n = mapM_ putWord8 $ revSethighbits $ split7bits n
+	where
+		revSethighbits :: [Word8] -> [Word8]
+		revSethighbits []     = []
+		revSethighbits (x:xs) = reverse $ (x : map (\i -> setBit i 7) xs)
+		split7bits i
+			| i == 0    = []
+			| i <= 0x7f = [ fromIntegral i ]
+			| otherwise = fromIntegral (i .&. 0x7f) : split7bits (i `shiftR` 7)
+		
 
 {- | getIdentifier get an ASN1 encoded Identifier.
  - if the first 5 bytes value is less than 1f then it's encoded on 1 byte, otherwise
@@ -133,7 +133,7 @@ getIdentifier = do
 			_ -> Universal -- this cannot happens because of the .&. 3
 	let pc = (w .&. 0x20) > 0
 	let val = fromIntegral (w .&. 0x1f)
-	vencoded <- if val < 0x1f then return val else getTagNumberLong True
+	vencoded <- if val < 0x1f then return val else getTagNumberLong
 	return (cl, pc, vencoded)
 
 {- | putIdentifier encode an ASN1 Identifier into a marshalled value -}
