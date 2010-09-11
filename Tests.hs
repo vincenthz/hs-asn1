@@ -1,15 +1,17 @@
 import Test.QuickCheck
-import qualified Test.HUnit as Unit
-import Test.HUnit ((~:), (~=?))
 import Text.Printf
+
 import Data.ASN1.Raw
 import Data.ASN1.DER (ASN1(..))
 import qualified Data.ASN1.DER as DER
+
 import Data.Binary.Get
 import Data.Binary.Put
 import Data.Word
+
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as L
+
 import Control.Monad
 import System.IO
 
