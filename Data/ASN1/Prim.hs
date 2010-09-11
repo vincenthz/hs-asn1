@@ -29,6 +29,12 @@ module Data.ASN1.Prim
 	, getOID
 	, getUTCTime
 	, getGeneralizedTime
+	, getGraphicString
+	, getVisibleString
+	, getGeneralString
+	, getUniversalString
+	, getCharacterString
+	, getBMPString
 
 	-- * marshall an ASN1 type to a bytestring
 	, putUTCTime
@@ -74,6 +80,8 @@ data ASN1 =
 	| VisibleString L.ByteString
 	| GeneralString L.ByteString
 	| UniversalString L.ByteString
+	| CharacterString L.ByteString
+	| BMPString L.ByteString
 	| Other TagClass TagNumber (Either ByteString [ASN1])
 	deriving (Show, Eq)
 
@@ -152,6 +160,24 @@ getVideoTexString = either Left (Right . VideoTexString) . getString (\_ -> Noth
 
 getIA5String :: ValStruct -> Either ASN1Err ASN1
 getIA5String = either Left (Right . IA5String) . getString (\_ -> Nothing)
+
+getGraphicString :: ValStruct -> Either ASN1Err ASN1
+getGraphicString = either Left (Right . GraphicString) . getString (\_ -> Nothing)
+
+getVisibleString :: ValStruct -> Either ASN1Err ASN1
+getVisibleString = either Left (Right . VisibleString) . getString (\_ -> Nothing)
+
+getGeneralString :: ValStruct -> Either ASN1Err ASN1
+getGeneralString = either Left (Right . GeneralString) . getString (\_ -> Nothing)
+
+getUniversalString :: ValStruct -> Either ASN1Err ASN1
+getUniversalString = either Left (Right . UniversalString) . getString (\_ -> Nothing)
+
+getCharacterString :: ValStruct -> Either ASN1Err ASN1
+getCharacterString = either Left (Right . CharacterString) . getString (\_ -> Nothing)
+
+getBMPString :: ValStruct -> Either ASN1Err ASN1
+getBMPString = either Left (Right . BMPString) . getString (\_ -> Nothing)
 
 getNull :: ByteString -> Either ASN1Err ASN1
 getNull s = if B.length s == 0 then Right Null else Left $ ASN1Misc "Null: data length not within bound"

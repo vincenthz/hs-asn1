@@ -59,12 +59,12 @@ ofRaw (Value Universal 0x15 v)               = getVideoTexString v
 ofRaw (Value Universal 0x16 v)               = getIA5String v
 ofRaw (Value Universal 0x17 x)               = getUTCTime x
 ofRaw (Value Universal 0x18 x)               = getGeneralizedTime x
-ofRaw (Value Universal 0x19 _)               = Left $ ASN1NotImplemented "x"
-ofRaw (Value Universal 0x1a _)               = Left $ ASN1NotImplemented "x"
-ofRaw (Value Universal 0x1b _)               = Left $ ASN1NotImplemented "x"
-ofRaw (Value Universal 0x1c _)               = Left $ ASN1NotImplemented "x"
-ofRaw (Value Universal 0x1d _)               = Left $ ASN1NotImplemented "CHARACTER STRING"
-ofRaw (Value Universal 0x1e _)               = Left $ ASN1NotImplemented "BMPString"
+ofRaw (Value Universal 0x19 x)               = getGraphicString x
+ofRaw (Value Universal 0x1a x)               = getVisibleString x
+ofRaw (Value Universal 0x1b x)               = getGeneralString x
+ofRaw (Value Universal 0x1c x)               = getUniversalString x
+ofRaw (Value Universal 0x1d x)               = getCharacterString x
+ofRaw (Value Universal 0x1e x)               = getBMPString x
 ofRaw (Value tc tn (Primitive b))            = Right $ Other tc tn (Left b)
 ofRaw (Value tc tn (Constructed l))          = either Left (Right . Other tc tn . Right) $ ofRaws l
 
@@ -92,6 +92,8 @@ toRaw (GraphicString b)      = Value Universal 0x19 (putString b)
 toRaw (VisibleString b)      = Value Universal 0x1a (putString b)
 toRaw (GeneralString b)      = Value Universal 0x1b (putString b)
 toRaw (UniversalString b)    = Value Universal 0x1c (putString b)
+toRaw (CharacterString b)    = Value Universal 0x1d (putString b)
+toRaw (BMPString b)          = Value Universal 0x1e (putString b)
 toRaw (Other tc tn c)        = Value tc tn (either Primitive (Constructed . map toRaw) c)
 
 decodeASN1Get :: Get (Either ASN1Err ASN1)
