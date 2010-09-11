@@ -7,15 +7,15 @@
 --
 -- A module containing ASN1 DER specification serialization/derialization tools
 --
-module Data.ASN1.DER (
-	TagClass(..),
-	ASN1(..),
+module Data.ASN1.DER
+	( TagClass(..)
+	, ASN1(..)
 
 	-- * DER serialize functions
-	decodeASN1Get,
-	decodeASN1,
-	encodeASN1Put,
-	encodeASN1
+	, decodeASN1Get
+	, decodeASN1
+	, encodeASN1Put
+	, encodeASN1
 	) where
 
 import Data.ASN1.Raw

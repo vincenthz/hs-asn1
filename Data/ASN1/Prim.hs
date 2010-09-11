@@ -8,34 +8,35 @@
 -- Tools to read ASN1 primitive (e.g. boolean, int)
 --
 
-module Data.ASN1.Prim (
+module Data.ASN1.Prim
+	(
 	-- * ASN1 high level algebraic type
-	ASN1(..),
+	  ASN1(..)
 
 	-- * marshall an ASN1 type from a val struct or a bytestring
-	getEOC,
-	getBoolean,
-	getInteger,
-	getBitString,
-	getOctetString,
-	getUTF8String,
-	getNumericString,
-	getPrintableString,
-	getT61String,
-	getVideoTexString,
-	getIA5String,
-	getNull,
-	getOID,
-	getUTCTime,
-	getGeneralizedTime,
+	, getEOC
+	, getBoolean
+	, getInteger
+	, getBitString
+	, getOctetString
+	, getUTF8String
+	, getNumericString
+	, getPrintableString
+	, getT61String
+	, getVideoTexString
+	, getIA5String
+	, getNull
+	, getOID
+	, getUTCTime
+	, getGeneralizedTime
 
 	-- * marshall an ASN1 type to a bytestring
-	putUTCTime,
-	putGeneralizedTime,
-	putInteger,
-	putBitString,
-	putString,
-	putOID
+	, putUTCTime
+	, putGeneralizedTime
+	, putInteger
+	, putBitString
+	, putString
+	, putOID
 	) where
 
 import Data.ASN1.Internal

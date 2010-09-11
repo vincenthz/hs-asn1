@@ -7,19 +7,19 @@
 --
 -- A module containing ASN1 BER specification serialization/derialization tools
 --
-module Data.ASN1.BER (
-	TagClass(..),
-	ASN1(..),
+module Data.ASN1.BER
+	( TagClass(..)
+	, ASN1(..)
 
 	-- * BER interface when using directly Raw objects
-	ofRaw,
-	toRaw,
+	, ofRaw
+	, toRaw
 
 	-- * BER serial functions
-	decodeASN1Get,
-	decodeASN1,
-	encodeASN1Put,
-	encodeASN1
+	, decodeASN1Get
+	, decodeASN1
+	, encodeASN1Put
+	, encodeASN1
 	) where
 
 import Data.ASN1.Raw

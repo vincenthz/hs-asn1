@@ -8,21 +8,25 @@
 --
 -- A module containing raw ASN1 serialization/derialization tools
 --
-module Data.ASN1.Raw (
-	GetErr,
-	runGetErr,
-	runGetErrInGet,
-	ASN1Err(..),
-	CheckFn,
-	TagClass(..),
-	TagNumber,
-	ValLength(..),
-	ValStruct(..),
-	Value(..),
-	getValueCheck,
-	getValue,
-	putValuePolicy,
-	putValue
+module Data.ASN1.Raw
+	( GetErr
+	-- * get structure
+	, runGetErr
+	, runGetErrInGet
+	-- * ASN1 definitions
+	, ASN1Err(..)
+	, CheckFn
+	, TagClass(..)
+	, TagNumber
+	, ValLength(..)
+	, ValStruct(..)
+	, Value(..)
+	-- * get value from a Get structure
+	, getValueCheck
+	, getValue
+	-- * put value in a Put structure
+	, putValuePolicy
+	, putValue
 	) where
 
 import Data.Bits
