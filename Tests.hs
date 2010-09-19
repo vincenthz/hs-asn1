@@ -52,7 +52,7 @@ instance Arbitrary Value where
 	arbitrary = liftM3 Value arbitrary (suchThat arbitrary (\i -> i > 0)) arbitrary
 
 arbitraryTime = do
-	y <- choose (1950, 2050)
+	y <- choose (1951, 2050)
 	m <- choose (0, 11)
 	d <- choose (0, 31)
 	h <- choose (0, 23)
