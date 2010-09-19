@@ -34,12 +34,11 @@ intOfBytes b
 {- | bytesOfInt convert an integer into a two's completemented list of bytes -}
 bytesOfInt :: Integer -> [Word8]
 bytesOfInt i
-	| i > 0      = ints
+	| i > 0      = if testBit (head uints) 7 then 0 : uints else uints
 	| i == 0     = [0]
-	| otherwise  = reverse $ plusOne $ reverse $ map complement $ ints
+	| otherwise  = if testBit (head nints) 7 then nints else 0xff : nints
 	where
 		uints = bytesOfUInt (abs i)
-		isNeg = testBit (head uints) 7
-		ints  = if isNeg then 0 : uints else uints
-		plusOne []     = []
+		nints = reverse $ plusOne $ reverse $ map complement $ uints
+		plusOne []     = [1]
 		plusOne (x:xs) = if x == 0xff then 0 : plusOne xs else (x+1) : xs
