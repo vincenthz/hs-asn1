@@ -23,7 +23,7 @@ Library
   Build-Depends:     base >= 3 && < 5,
                      binary >= 0.5,
                      bytestring,
-                     mtl
+                     monads-fd
   Exposed-modules:   Data.ASN1.BER
                      Data.ASN1.CER
                      Data.ASN1.DER
