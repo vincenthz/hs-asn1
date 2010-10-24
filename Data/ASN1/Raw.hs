@@ -177,16 +177,16 @@ getLength = do
 {- | putLength encode a length into a ASN1 length.
  - see getLength for the encoding rules -}
 putLength :: ValLength -> Put
-putLength (LenShort i) = do
-	when (i < 0 || i > 0x7f) (error "putLength: short length is not between 0x0 and 0x80")
-	putWord8 (fromIntegral i)
+putLength (LenShort i)
+	| i < 0 || i > 0x7f = error "putLength: short length is not between 0x0 and 0x80"
+	| otherwise         = putWord8 $ fromIntegral i
 
-putLength (LenLong _ i) = do
-	when (i < 0) (error "putLength: long length is negative")
-	let lw = bytesOfUInt $ fromIntegral i
-	let lenbytes = fromIntegral (length lw .|. 0x80)
-	putWord8 lenbytes
-	mapM_ putWord8 lw
+putLength (LenLong _ i)
+	| i < 0     = error "putLength: long length is negative"
+	| otherwise = putWord8 lenbytes >> mapM_ putWord8 lw
+		where
+			lw       = bytesOfUInt $ fromIntegral i
+			lenbytes = fromIntegral (length lw .|. 0x80)
 	
 putLength (LenIndefinite) = putWord8 0x80
 
