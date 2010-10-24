@@ -165,12 +165,11 @@ getLength :: GetErr ValLength
 getLength = do
 	l1 <- geteWord8
 	if testBit l1 7
-		then
-			case fromIntegral (clearBit l1 7) of
-				0   -> return LenIndefinite
-				len -> do
-					lw <- geteBytes len
-					return $ LenLong len (fromIntegral $ snd $ uintOfBytes lw)
+		then case fromIntegral (clearBit l1 7) of
+			0   -> return LenIndefinite
+			len -> do
+				lw <- geteBytes len
+				return $ LenLong len (fromIntegral $ snd $ uintOfBytes lw)
 		else
 			return $ LenShort $ fromIntegral l1
 
@@ -195,12 +194,8 @@ getValueConstructed :: CheckFn -> GetErr [Value]
 getValueConstructed check = do
 	remain <- liftGet remaining
 	if remain > 0
-		then do
-			o <- getValueCheck check
-			l <- getValueConstructed check
-			return (o : l)
-		else
-			return []
+		then liftM2 (:) (getValueCheck check) (getValueConstructed check)
+		else return []
 
 {- helper to getValue to build a constructed list of values when length is unknown -}
 getValueConstructedUntilEOC :: CheckFn -> GetErr [Value]
@@ -209,18 +204,15 @@ getValueConstructedUntilEOC check = do
 	case o of
 		-- technically EOC should also match (Primitive B.empty) (LenShort 0)
 		Value Universal 0 _ -> return []
-		_                   -> do
-			l <- getValueConstructedUntilEOC check
-			return (o : l)
+		_                   -> liftM (o :) (getValueConstructedUntilEOC check)
 
 getValueOfLength :: CheckFn -> Int -> Bool -> GetErr ValStruct
 getValueOfLength check len pc = do
 	b <- geteBytes len
 	if pc
-		then
-			case runGetErr (getValueConstructed check) (L.fromChunks [b]) of
-				Right x  -> return $ Constructed x
-				Left err -> throwError err
+		then case runGetErr (getValueConstructed check) (L.fromChunks [b]) of
+			Right x  -> return $ Constructed x
+			Left err -> throwError err
 		else
 			return $ Primitive b
 
