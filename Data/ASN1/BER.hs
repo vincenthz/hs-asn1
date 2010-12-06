@@ -17,16 +17,23 @@ module Data.ASN1.BER
 
 	-- * BER serial functions
 	, decodeASN1Get
+	, decodeASN1State
 	, decodeASN1
+	, decodeASN1s
 	, encodeASN1Put
+	, encodeASN1sPut
 	, encodeASN1
+	, encodeASN1s
 	) where
 
+import Data.Int
 import Data.ASN1.Raw
 import Data.ASN1.Prim
 import Data.Either
 import Data.Binary.Get
 import Data.Binary.Put
+import Control.Monad (liftM)
+import Control.Monad.Error (throwError)
 import qualified Data.ByteString.Lazy as L
 import qualified Data.ByteString as B
 
@@ -99,11 +106,27 @@ toRaw (Other tc tn c)        = Value tc tn (either Primitive (Constructed . map 
 decodeASN1Get :: Get (Either ASN1Err ASN1)
 decodeASN1Get = either Left ofRaw `fmap` runGetErrInGet getValue
 
+decodeASN1State :: L.ByteString -> Either ASN1Err (ASN1, L.ByteString, Int64)
+decodeASN1State b =
+	runGetErrState (getValue >>= either throwError return . ofRaw) b 0
+
 decodeASN1 :: L.ByteString -> Either ASN1Err ASN1
 decodeASN1 = either Left ofRaw . runGetErr getValue
+
+decodeASN1s :: L.ByteString -> Either ASN1Err [ASN1]
+decodeASN1s = loop where
+	loop z = case decodeASN1State z of
+		Left err -> throwError err
+		Right (v, rest, _) -> if L.length rest > 0 then liftM (v :) (loop rest) else return [v]
 
 encodeASN1Put :: ASN1 -> Put
 encodeASN1Put = putValue . toRaw
 
+encodeASN1sPut :: [ASN1] -> Put
+encodeASN1sPut = mapM_ encodeASN1Put
+
 encodeASN1 :: ASN1 -> L.ByteString
 encodeASN1 = runPut . encodeASN1Put
+
+encodeASN1s :: [ASN1] -> L.ByteString
+encodeASN1s = runPut . encodeASN1sPut

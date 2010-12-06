@@ -12,6 +12,7 @@ module Data.ASN1.Raw
 	( GetErr
 	-- * get structure
 	, runGetErr
+	, runGetErrState
 	, runGetErrInGet
 	-- * ASN1 definitions
 	, ASN1Err(..)
@@ -30,6 +31,7 @@ module Data.ASN1.Raw
 	) where
 
 import Data.Bits
+import Data.Int
 import Data.ASN1.Internal
 import Data.Binary.Get
 import Data.Binary.Put
@@ -86,6 +88,12 @@ instance Functor GetErr where
 
 runGetErr :: GetErr a -> L.ByteString -> Either ASN1Err a
 runGetErr = runGet . runErrorT . runGE
+
+runGetErrState :: GetErr a -> L.ByteString -> Int64 -> Either ASN1Err (a, L.ByteString, Int64)
+runGetErrState g l o =
+	case runGetState (runErrorT $ runGE g) l o of
+		(Left err, _, _)           -> Left err
+		(Right v, datarem, parsed) -> Right (v, datarem, parsed)
 
 runGetErrInGet :: GetErr a -> Get (Either ASN1Err a)
 runGetErrInGet = runErrorT . runGE
