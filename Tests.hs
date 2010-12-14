@@ -103,7 +103,7 @@ prop_value_marshalling_id v = (getVal . putVal) v == Right v
 prop_asn1_marshalling_id :: ASN1 -> Bool
 prop_asn1_marshalling_id v = (DER.decodeASN1 . DER.encodeASN1) v == Right v
 
-args = Args
+args = stdArgs
 	{ replay     = Nothing
 	, maxSuccess = 500
 	, maxDiscard = 2000
