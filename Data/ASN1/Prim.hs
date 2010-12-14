@@ -43,6 +43,7 @@ module Data.ASN1.Prim
 	, putBitString
 	, putString
 	, putOID
+	, encodeUCS2BE
 	) where
 
 import Data.ASN1.Internal
@@ -55,6 +56,9 @@ import Data.ByteString (ByteString)
 import Data.Char (ord)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as L
+import Data.Text.Lazy (Text)
+import qualified Data.Text.Lazy as T
+import Data.Text.Lazy.Encoding (decodeASCII, decodeUtf8, decodeUtf32BE)
 
 data ASN1 =
 	  EOC
@@ -66,24 +70,40 @@ data ASN1 =
 	| OID [Integer]
 	| Real Double
 	| Enumerated
-	| UTF8String L.ByteString
+	| UTF8String Text
 	| Sequence [ASN1]
 	| Set [ASN1]
 	| NumericString L.ByteString
-	| PrintableString L.ByteString
+	| PrintableString Text
 	| T61String L.ByteString
 	| VideoTexString L.ByteString
-	| IA5String L.ByteString
+	| IA5String Text
 	| UTCTime (Int, Int, Int, Int, Int, Int, Bool)
 	| GeneralizedTime (Int, Int, Int, Int, Int, Int, Bool)
 	| GraphicString L.ByteString
 	| VisibleString L.ByteString
 	| GeneralString L.ByteString
-	| UniversalString L.ByteString
+	| UniversalString Text
 	| CharacterString L.ByteString
-	| BMPString L.ByteString
+	| BMPString Text
 	| Other TagClass TagNumber (Either ByteString [ASN1])
 	deriving (Show, Eq)
+
+encodeUCS2BE :: Text -> L.ByteString
+encodeUCS2BE t =
+	L.pack $ concatMap (\c -> let (d,m) = (fromEnum c) `divMod` 256 in [fromIntegral m,fromIntegral d] ) $ T.unpack t
+
+decodeUCS2BE :: L.ByteString -> Text
+decodeUCS2BE l = T.pack $ loop l
+	where
+		loop x
+			| L.null x  = []
+			| otherwise = 
+				let (h, r) = L.splitAt 2 l in
+				case L.unpack h of
+					[a,b] -> (toEnum $ (fromIntegral a) + (fromIntegral b) * 256) : loop r
+					_     -> loop r
+	
 
 getEOC :: ByteString -> Either ASN1Err ASN1
 getEOC s =
@@ -147,10 +167,10 @@ getNumericString :: ValStruct -> Either ASN1Err ASN1
 getNumericString = either Left (Right . NumericString) . getString (\_ -> Nothing)
 
 getPrintableString :: ValStruct -> Either ASN1Err ASN1
-getPrintableString = either Left (Right . PrintableString) . getString (\_ -> Nothing)
+getPrintableString = either Left (Right . PrintableString . decodeASCII) . getString (\_ -> Nothing)
 
 getUTF8String :: ValStruct -> Either ASN1Err ASN1
-getUTF8String = either Left (Right . UTF8String) . getString (\_ -> Nothing)
+getUTF8String = either Left (Right . UTF8String . decodeUtf8) . getString (\_ -> Nothing)
 
 getT61String :: ValStruct -> Either ASN1Err ASN1
 getT61String = either Left (Right . T61String) . getString (\_ -> Nothing)
@@ -159,7 +179,7 @@ getVideoTexString :: ValStruct -> Either ASN1Err ASN1
 getVideoTexString = either Left (Right . VideoTexString) . getString (\_ -> Nothing)
 
 getIA5String :: ValStruct -> Either ASN1Err ASN1
-getIA5String = either Left (Right . IA5String) . getString (\_ -> Nothing)
+getIA5String = either Left (Right . IA5String . decodeASCII) . getString (\_ -> Nothing)
 
 getGraphicString :: ValStruct -> Either ASN1Err ASN1
 getGraphicString = either Left (Right . GraphicString) . getString (\_ -> Nothing)
@@ -171,13 +191,13 @@ getGeneralString :: ValStruct -> Either ASN1Err ASN1
 getGeneralString = either Left (Right . GeneralString) . getString (\_ -> Nothing)
 
 getUniversalString :: ValStruct -> Either ASN1Err ASN1
-getUniversalString = either Left (Right . UniversalString) . getString (\_ -> Nothing)
+getUniversalString = either Left (Right . UniversalString . decodeUtf32BE) . getString (\_ -> Nothing)
 
 getCharacterString :: ValStruct -> Either ASN1Err ASN1
 getCharacterString = either Left (Right . CharacterString) . getString (\_ -> Nothing)
 
 getBMPString :: ValStruct -> Either ASN1Err ASN1
-getBMPString = either Left (Right . BMPString) . getString (\_ -> Nothing)
+getBMPString = either Left (Right . BMPString . decodeUCS2BE) . getString (\_ -> Nothing)
 
 getNull :: ByteString -> Either ASN1Err ASN1
 getNull s = if B.length s == 0 then Right Null else Left $ ASN1Misc "Null: data length not within bound"

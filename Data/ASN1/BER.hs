@@ -36,6 +36,7 @@ import Control.Monad (liftM)
 import Control.Monad.Error (throwError)
 import qualified Data.ByteString.Lazy as L
 import qualified Data.ByteString as B
+import Data.Text.Lazy.Encoding (encodeUtf8, encodeUtf32BE)
 
 ofRaws :: [Value] -> Either ASN1Err [ASN1]
 ofRaws x = if l == [] then Right r else Left $ ASN1Multiple l
@@ -83,24 +84,24 @@ toRaw (BitString i bits)     = Value Universal 0x3 (putBitString i bits)
 toRaw (OctetString b)        = Value Universal 0x4 (putString b)
 toRaw Null                   = Value Universal 0x5 (Primitive B.empty)
 toRaw (OID oid)              = Value Universal 0x6 (putOID oid)
-toRaw (Real f)               = Value Universal 0x9 (Constructed []) -- not implemented
+toRaw (Real _)               = Value Universal 0x9 (Constructed []) -- not implemented
 toRaw Enumerated             = Value Universal 0xa (Constructed []) -- not implemented
-toRaw (UTF8String b)         = Value Universal 0xc (putString b)
+toRaw (UTF8String b)         = Value Universal 0xc (putString $ encodeUtf8 b)
 toRaw (Sequence children)    = Value Universal 0x10 (Constructed $ map toRaw children)
 toRaw (Set children)         = Value Universal 0x11 (Constructed $ map toRaw children)
 toRaw (NumericString b)      = Value Universal 0x12 (putString b)
-toRaw (PrintableString b)    = Value Universal 0x13 (putString b)
+toRaw (PrintableString b)    = Value Universal 0x13 (putString $ encodeUtf8 b)
 toRaw (T61String b)          = Value Universal 0x14 (putString b)
 toRaw (VideoTexString b)     = Value Universal 0x15 (putString b)
-toRaw (IA5String b)          = Value Universal 0x16 (putString b)
+toRaw (IA5String b)          = Value Universal 0x16 (putString $ encodeUtf8 b)
 toRaw (UTCTime time)         = Value Universal 0x17 (putUTCTime time)
 toRaw (GeneralizedTime time) = Value Universal 0x18 (putGeneralizedTime time)
 toRaw (GraphicString b)      = Value Universal 0x19 (putString b)
 toRaw (VisibleString b)      = Value Universal 0x1a (putString b)
 toRaw (GeneralString b)      = Value Universal 0x1b (putString b)
-toRaw (UniversalString b)    = Value Universal 0x1c (putString b)
+toRaw (UniversalString b)    = Value Universal 0x1c (putString $ encodeUtf32BE b)
 toRaw (CharacterString b)    = Value Universal 0x1d (putString b)
-toRaw (BMPString b)          = Value Universal 0x1e (putString b)
+toRaw (BMPString b)          = Value Universal 0x1e (putString $ encodeUCS2BE b)
 toRaw (Other tc tn c)        = Value tc tn (either Primitive (Constructed . map toRaw) c)
 
 decodeASN1Get :: Get (Either ASN1Err ASN1)

@@ -11,6 +11,7 @@ import Data.Word
 
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as L
+import qualified Data.Text.Lazy as T
 
 import Control.Monad
 import System.IO
@@ -34,6 +35,12 @@ instance Arbitrary L.ByteString where
 		len <- choose (0, 529) :: Gen Int
 		ws <- replicateM len (choose (0, 255) :: Gen Int)
 		return $ L.pack $ map fromIntegral ws
+
+instance Arbitrary T.Text where
+	arbitrary = do
+		len <- choose (0, 529) :: Gen Int
+		ws <- replicateM len arbitrary
+		return $ T.pack ws
 
 instance Arbitrary TagClass where
 	arbitrary = elements [ Universal, Application, Context, Private ]
@@ -67,6 +74,15 @@ arbitraryListASN1 = choose (0, 20) >>= \len -> replicateM len (suchThat arbitrar
 		aList (Sequence _) = True
 		aList _            = False
 
+arbitraryPrintString = do
+	let printableString = (['a'..'z'] ++ ['A'..'Z'] ++ ['0'..'9'] ++ " ()+,-./:=?")
+	x <- replicateM 21 (elements printableString)
+	return $ T.pack x
+
+arbitraryIA5String = do
+	x <- replicateM 21 (elements $ map toEnum [0..127])
+	return $ T.pack x
+
 instance Arbitrary ASN1 where
 	arbitrary = oneof
 		[ return EOC
@@ -82,10 +98,10 @@ instance Arbitrary ASN1 where
 		, liftM Sequence arbitraryListASN1
 		, liftM Set arbitraryListASN1
 		, liftM NumericString arbitrary
-		, liftM PrintableString arbitrary
+		, liftM PrintableString arbitraryPrintString
 		, liftM T61String arbitrary
 		, liftM VideoTexString arbitrary
-		, liftM IA5String arbitrary
+		, liftM IA5String arbitraryIA5String
 		, liftM UTCTime arbitraryTime
 		, liftM GeneralizedTime arbitraryTime
 		, liftM GraphicString arbitrary

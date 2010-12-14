@@ -25,6 +25,7 @@ import Data.Binary.Put
 import qualified Data.ASN1.BER as BER
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as L
+import Data.Text.Lazy.Encoding (encodeUtf8, encodeUtf32BE)
 
 {- | check if the value is bounded by CER policies -}
 check :: (TagClass, Bool, TagNumber) -> ValLength -> Maybe ASN1Err
@@ -42,10 +43,10 @@ require no more than 1000 contents octets, and as a constructed encoding otherwi
 The string fragments contained in the constructed encoding shall be encoded with a primitive encoding.
 The encoding of each fragment, except possibly the last, shall have 1000 contents octets.
 -}
-putStringCER :: (L.ByteString -> ASN1) -> L.ByteString -> ValStruct
-putStringCER obj l =
+putStringCER :: Int -> L.ByteString -> ValStruct
+putStringCER tn l =
 	if L.length l > 1000
-		then Constructed $ map (toRaw . obj) $ repack1000 l
+		then Constructed $ map (Value Universal tn . (Primitive . B.concat . L.toChunks)) $ repack1000 l
 		else Primitive $ B.concat $ L.toChunks l
 	where
 		repack1000 x =
@@ -59,17 +60,18 @@ putStringCER obj l =
 {- | toRaw create a CER encoded value ready -}
 toRaw :: ASN1 -> Value
 toRaw (BitString i bits)     = Value Universal 0x3 (putBitString i bits)
-toRaw (OctetString b)        = Value Universal 0x4 (putStringCER OctetString b)
-toRaw (UTF8String b)         = Value Universal 0xc (putStringCER UTF8String b)
-toRaw (NumericString b)      = Value Universal 0x12 (putStringCER NumericString b)
-toRaw (PrintableString b)    = Value Universal 0x13 (putStringCER PrintableString b)
-toRaw (T61String b)          = Value Universal 0x14 (putStringCER T61String b)
-toRaw (VideoTexString b)     = Value Universal 0x15 (putStringCER VideoTexString b)
-toRaw (IA5String b)          = Value Universal 0x16 (putStringCER IA5String b)
-toRaw (GraphicString b)      = Value Universal 0x19 (putStringCER GraphicString b)
-toRaw (VisibleString b)      = Value Universal 0x1a (putStringCER VisibleString b)
-toRaw (GeneralString b)      = Value Universal 0x1b (putStringCER GeneralString b)
-toRaw (UniversalString b)    = Value Universal 0x1c (putStringCER UniversalString b)
+toRaw (OctetString b)        = Value Universal 0x4 (putStringCER 0x4 b)
+toRaw (UTF8String b)         = Value Universal 0xc (putStringCER 0xc (encodeUtf8 b))
+toRaw (NumericString b)      = Value Universal 0x12 (putStringCER 0x12 b)
+toRaw (PrintableString b)    = Value Universal 0x13 (putStringCER 0x13 (encodeUtf8 b))
+toRaw (T61String b)          = Value Universal 0x14 (putStringCER 0x14 b)
+toRaw (VideoTexString b)     = Value Universal 0x15 (putStringCER 0x15 b)
+toRaw (IA5String b)          = Value Universal 0x16 (putStringCER 0x16 (encodeUtf8 b))
+toRaw (GraphicString b)      = Value Universal 0x19 (putStringCER 0x19 b)
+toRaw (VisibleString b)      = Value Universal 0x1a (putStringCER 0x1a b)
+toRaw (GeneralString b)      = Value Universal 0x1b (putStringCER 0x1b b)
+toRaw (UniversalString b)    = Value Universal 0x1c (putStringCER 0x1c (encodeUtf32BE b))
+toRaw (BMPString b)          = Value Universal 0x1e (putStringCER 0x1e (encodeUCS2BE b))
 toRaw v                      = BER.toRaw v
 
 decodeASN1Get :: Get (Either ASN1Err ASN1)
