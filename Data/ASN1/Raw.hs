@@ -141,17 +141,18 @@ getIdentifier = do
 	vencoded <- if val < 0x1f then return val else getTagLong
 	return (cl, pc, vencoded)
 
-{- | putIdentifier encode an ASN1 Identifier into a marshalled value -}
+{- put first word of a header -}
 putIdentifier :: Identifier -> Put
-putIdentifier (cl, pc, val) = do
-	let cli = fromIntegral $ fromEnum cl
-	let pcval = if pc then 0x20 else 0x00
-	if val < 0x1f
-		then
-			putWord8 $ fromIntegral $ (cli `shiftL` 6) .|. pcval .|. val
-		else do
-			putWord8 $ fromIntegral $ (cli `shiftL` 6) .|. pcval .|. 0x1f
-			putTagLong val
+putIdentifier (cl, pc, tag) = do
+	putWord8 $ putFirstWord (cl, pc, if tag < 0x1f then tag else 0x1f)
+	when (tag >= 0x1f) $ putTagLong tag
+
+{- put first word of a header -}
+putFirstWord :: (ASN1Class, Bool, ASN1Tag) -> Word8
+putFirstWord (cl,pc,t1) = (cli `shiftL` 6) .|. (pcval `shiftL` 5) .|. (fromIntegral t1 .&. 0x1f)
+	where
+		cli   = fromIntegral $ fromEnum cl
+		pcval = if pc then 0x1 else 0x0
 
 {- | getLength get the ASN1 encoded length of an item.
  - if less than 0x80 then it's encoded on 1 byte, otherwise
