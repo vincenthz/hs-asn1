@@ -107,8 +107,8 @@ geteBytes :: Int -> GetErr ByteString
 geteBytes = liftGet . getBytes
 
 {- marshall helper for getIdentifier to unserialize long tag number -}
-getTagNumberLong :: GetErr ASN1Tag
-getTagNumberLong = getNext 0 True
+getTagLong :: GetErr ASN1Tag
+getTagLong = getNext 0 True
 	where getNext n nz = do
 		t <- fromIntegral `fmap` geteWord8
 		when (nz && t == 0x80) $ throwError ASN1LengthDecodingLongContainsZero
@@ -117,8 +117,8 @@ getTagNumberLong = getNext 0 True
 			else return (n `shiftL` 7 + t)
 
 {- marshall helper for putIdentifier to serialize long tag number -}
-putTagNumberLong :: ASN1Tag -> Put
-putTagNumberLong n = mapM_ putWord8 $ revSethighbits $ split7bits n
+putTagLong :: ASN1Tag -> Put
+putTagLong n = mapM_ putWord8 $ revSethighbits $ split7bits n
 	where
 		revSethighbits :: [Word8] -> [Word8]
 		revSethighbits []     = []
@@ -138,7 +138,7 @@ getIdentifier = do
 	let cl = toEnum $ fromIntegral $ w `shiftR` 6
 	let pc = (w .&. 0x20) > 0
 	let val = fromIntegral (w .&. 0x1f)
-	vencoded <- if val < 0x1f then return val else getTagNumberLong
+	vencoded <- if val < 0x1f then return val else getTagLong
 	return (cl, pc, vencoded)
 
 {- | putIdentifier encode an ASN1 Identifier into a marshalled value -}
@@ -151,7 +151,7 @@ putIdentifier (cl, pc, val) = do
 			putWord8 $ fromIntegral $ (cli `shiftL` 6) .|. pcval .|. val
 		else do
 			putWord8 $ fromIntegral $ (cli `shiftL` 6) .|. pcval .|. 0x1f
-			putTagNumberLong val
+			putTagLong val
 
 {- | getLength get the ASN1 encoded length of an item.
  - if less than 0x80 then it's encoded on 1 byte, otherwise
