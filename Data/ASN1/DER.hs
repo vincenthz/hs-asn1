@@ -8,7 +8,7 @@
 -- A module containing ASN1 DER specification serialization/derialization tools
 --
 module Data.ASN1.DER
-	( TagClass(..)
+	( ASN1Class(..)
 	, ASN1(..)
 
 	-- * DER serialize functions
@@ -33,7 +33,7 @@ import qualified Data.ASN1.BER as BER
 import qualified Data.ByteString.Lazy as L
 
 {- | Check if the length is the minimum possible and it's not indefinite -}
-checkLength :: ValLength -> Maybe ASN1Err
+checkLength :: ASN1Length -> Maybe ASN1Err
 checkLength LenIndefinite = Just $ ASN1PolicyFailed "DER" "indefinite length not allowed"
 checkLength (LenShort _)  = Nothing
 checkLength (LenLong n i)
@@ -42,11 +42,11 @@ checkLength (LenLong n i)
 	| otherwise           = if i >= 2^((n-1)*8) && i < 2^(n*8) then Nothing else Just $ ASN1PolicyFailed "DER" "long length is not shortest"
 
 {- | check if the value type is correct -}
-checkType :: TagClass -> TagNumber -> Maybe ASN1Err
+checkType :: ASN1Class -> ASN1Tag -> Maybe ASN1Err
 checkType _ _ = Nothing
 
 {- | check if the value is bounded by DER policies -}
-check :: (TagClass, Bool, TagNumber) -> ValLength -> Maybe ASN1Err
+check :: (ASN1Class, Bool, ASN1Tag) -> ASN1Length -> Maybe ASN1Err
 check (tc,_,tn) vallen = checkLength vallen `mplus` checkType tc tn
 
 {- | ofRaw same as BER.ofRAW but check some additional DER constraint. -}

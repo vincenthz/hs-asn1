@@ -17,9 +17,9 @@ module Data.ASN1.Raw
 	-- * ASN1 definitions
 	, ASN1Err(..)
 	, CheckFn
-	, TagClass(..)
-	, TagNumber
-	, ValLength(..)
+	, ASN1Class(..)
+	, ASN1Tag
+	, ASN1Length(..)
 	, ValStruct(..)
 	, Value(..)
 	-- * get value from a Get structure
@@ -41,29 +41,28 @@ import Control.Monad.Error
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as L
 
-data TagClass =
+data ASN1Class =
 	  Universal
 	| Application
 	| Context
 	| Private
 	deriving (Show, Eq)
 
-data ValLength =
+data ASN1Length =
 	  LenShort Int      -- ^ Short form with only one byte. length has to be < 127.
 	| LenLong Int Int   -- ^ Long form of N bytes
 	| LenIndefinite     -- ^ Length is indefinite expect an EOC in the stream to finish the type
 	deriving (Show, Eq)
 
-type TagNumber = Int
-type TagConstructed = Bool
-type Identifier = (TagClass, TagConstructed, TagNumber)
+type ASN1Tag = Int
+type Identifier = (ASN1Class, Bool, ASN1Tag)
 
 data ValStruct =
 	  Primitive ByteString -- ^ Primitive of a strict value
 	| Constructed [Value]  -- ^ Constructed of a list of values
 	deriving (Show, Eq)
 
-data Value = Value TagClass TagNumber ValStruct
+data Value = Value ASN1Class ASN1Tag ValStruct
 	deriving (Show, Eq)
 
 data ASN1Err =
@@ -74,7 +73,7 @@ data ASN1Err =
 	| ASN1Misc String
 	deriving (Show, Eq)
 
-type CheckFn = (TagClass, Bool, TagNumber) -> ValLength -> Maybe ASN1Err
+type CheckFn = (ASN1Class, Bool, ASN1Tag) -> ASN1Length -> Maybe ASN1Err
 
 instance Error ASN1Err where
 	noMsg = ASN1Misc ""
@@ -108,7 +107,7 @@ geteBytes :: Int -> GetErr ByteString
 geteBytes = liftGet . getBytes
 
 {- marshall helper for getIdentifier to unserialize long tag number -}
-getTagNumberLong :: GetErr TagNumber
+getTagNumberLong :: GetErr ASN1Tag
 getTagNumberLong = getNext 0 True
 	where getNext n nz = do
 		t <- fromIntegral `fmap` geteWord8
@@ -118,7 +117,7 @@ getTagNumberLong = getNext 0 True
 			else return (n `shiftL` 7 + t)
 
 {- marshall helper for putIdentifier to serialize long tag number -}
-putTagNumberLong :: TagNumber -> Put
+putTagNumberLong :: ASN1Tag -> Put
 putTagNumberLong n = mapM_ putWord8 $ revSethighbits $ split7bits n
 	where
 		revSethighbits :: [Word8] -> [Word8]
@@ -169,7 +168,7 @@ putIdentifier (cl, pc, val) = do
  - the first byte is the number of bytes to read as the length.
  - if the number of bytes is 0, then the length is indefinite,
  - and the content length is bounded by an EOC -}
-getLength :: GetErr ValLength
+getLength :: GetErr ASN1Length
 getLength = do
 	l1 <- geteWord8
 	if testBit l1 7
@@ -183,7 +182,7 @@ getLength = do
 
 {- | putLength encode a length into a ASN1 length.
  - see getLength for the encoding rules -}
-putLength :: ValLength -> Put
+putLength :: ASN1Length -> Put
 putLength (LenShort i)
 	| i < 0 || i > 0x7f = error "putLength: short length is not between 0x0 and 0x80"
 	| otherwise         = putWord8 $ fromIntegral i
@@ -251,7 +250,7 @@ putValStruct :: ValStruct -> Put
 putValStruct (Primitive x)   = putByteString x
 putValStruct (Constructed l) = mapM_ putValue l
 
-putValuePolicy :: (Value -> Int -> ValLength) -> Value -> Put
+putValuePolicy :: (Value -> Int -> ASN1Length) -> Value -> Put
 putValuePolicy policy v@(Value tc tn struct) = do
 	let pc =
 		case struct of

@@ -86,7 +86,7 @@ data ASN1 =
 	| UniversalString Text
 	| CharacterString L.ByteString
 	| BMPString Text
-	| Other TagClass TagNumber (Either ByteString [ASN1])
+	| Other ASN1Class ASN1Tag (Either ByteString [ASN1])
 	deriving (Show, Eq)
 
 encodeUCS2BE :: Text -> L.ByteString

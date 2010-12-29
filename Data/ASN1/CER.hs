@@ -8,7 +8,7 @@
 -- A module containing ASN1 CER specification serialization/derialization tools
 --
 module Data.ASN1.CER
-	( TagClass(..)
+	( ASN1Class(..)
 	, ASN1(..)
 
 	-- * CER serial functions
@@ -28,7 +28,7 @@ import qualified Data.ByteString.Lazy as L
 import Data.Text.Lazy.Encoding (encodeUtf8, encodeUtf32BE)
 
 {- | check if the value is bounded by CER policies -}
-check :: (TagClass, Bool, TagNumber) -> ValLength -> Maybe ASN1Err
+check :: (ASN1Class, Bool, ASN1Tag) -> ASN1Length -> Maybe ASN1Err
 check (_, _, _) _ = Nothing
 
 {- | ofRaw same as BER.ofRAW but check some additional CER constraint. -}
@@ -80,7 +80,7 @@ decodeASN1Get = runGetErrInGet (getValueCheck check) >>= return . either Left of
 decodeASN1 :: L.ByteString -> Either ASN1Err ASN1
 decodeASN1 b = either Left ofRaw $ runGetErr (getValueCheck check) b
 
-encodePolicyCER :: Value -> Int -> ValLength
+encodePolicyCER :: Value -> Int -> ASN1Length
 encodePolicyCER (Value _ _ (Primitive _)) len
 	| len < 0x80   = LenShort len
 	| otherwise    = LenLong 0 len

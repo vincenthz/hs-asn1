@@ -8,7 +8,7 @@
 -- A module containing ASN1 BER specification serialization/derialization tools
 --
 module Data.ASN1.BER
-	( TagClass(..)
+	( ASN1Class(..)
 	, ASN1(..)
 
 	-- * BER interface when using directly Raw objects

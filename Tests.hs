@@ -42,7 +42,7 @@ instance Arbitrary T.Text where
 		ws <- replicateM len arbitrary
 		return $ T.pack ws
 
-instance Arbitrary TagClass where
+instance Arbitrary ASN1Class where
 	arbitrary = elements [ Universal, Application, Context, Private ]
 
 arbitraryValueList = choose (0,20) >>= \len -> replicateM len (suchThat arbitrary (not . isConstructed))
