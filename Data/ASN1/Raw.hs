@@ -46,7 +46,7 @@ data ASN1Class =
 	| Application
 	| Context
 	| Private
-	deriving (Show, Eq)
+	deriving (Show,Eq,Ord,Enum)
 
 data ASN1Length =
 	  LenShort Int      -- ^ Short form with only one byte. length has to be < 127.
@@ -135,13 +135,7 @@ putTagNumberLong n = mapM_ putWord8 $ revSethighbits $ split7bits n
 getIdentifier :: GetErr Identifier
 getIdentifier = do
 	w <- geteWord8
-	let cl =
-		case (w `shiftR` 6) .&. 3 of
-			0 -> Universal
-			1 -> Application 
-			2 -> Context
-			3 -> Private
-			_ -> Universal -- this cannot happens because of the .&. 3
+	let cl = toEnum $ fromIntegral $ w `shiftR` 6
 	let pc = (w .&. 0x20) > 0
 	let val = fromIntegral (w .&. 0x1f)
 	vencoded <- if val < 0x1f then return val else getTagNumberLong
@@ -150,11 +144,7 @@ getIdentifier = do
 {- | putIdentifier encode an ASN1 Identifier into a marshalled value -}
 putIdentifier :: Identifier -> Put
 putIdentifier (cl, pc, val) = do
-	let cli = case cl of
-		Universal   -> 0
-		Application -> 1
-		Context     -> 2
-		Private     -> 3
+	let cli = fromIntegral $ fromEnum cl
 	let pcval = if pc then 0x20 else 0x00
 	if val < 0x1f
 		then
