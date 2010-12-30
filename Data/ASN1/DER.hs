@@ -12,25 +12,23 @@ module Data.ASN1.DER
 	, ASN1(..)
 
 	-- * DER serialize functions
+	{-
 	, decodeASN1Get
 	, decodeASN1State
+	-}
 	, decodeASN1
 	, decodeASN1s
-	, encodeASN1Put
-	, encodeASN1sPut
 	, encodeASN1
 	, encodeASN1s
 	) where
 
-import Data.Int
 import Data.ASN1.Raw
 import Data.ASN1.Prim
-import Data.Binary.Get
-import Data.Binary.Put
-import Control.Monad (mplus, liftM)
-import Control.Monad.Error (throwError)
+import Data.ASN1.Types (ASN1t)
 import qualified Data.ASN1.BER as BER
 import qualified Data.ByteString.Lazy as L
+
+{-
 
 {- | Check if the length is the minimum possible and it's not indefinite -}
 checkLength :: ASN1Length -> Maybe ASN1Err
@@ -73,15 +71,20 @@ decodeASN1s = loop where
 	loop z = case decodeASN1State z of
 		Left err -> throwError err
 		Right (v, rest, _) -> if L.length rest > 0 then liftM (v :) (loop rest) else return [v]
+-}
 
-encodeASN1Put :: ASN1 -> Put
-encodeASN1Put d = putValue $ toRaw d
+{-# DEPRECATED decodeASN1s "use stream types with decodeASN1Stream" #-}
+decodeASN1s :: L.ByteString -> Either ASN1Err [ASN1t]
+decodeASN1s = BER.decodeASN1s
 
-encodeASN1sPut :: [ASN1] -> Put
-encodeASN1sPut = mapM_ encodeASN1Put
+{-# DEPRECATED decodeASN1 "use stream types with decodeASN1Stream" #-}
+decodeASN1 :: L.ByteString -> Either ASN1Err ASN1t
+decodeASN1 = BER.decodeASN1
 
-encodeASN1 :: ASN1 -> L.ByteString
-encodeASN1 = runPut . encodeASN1Put
+{-# DEPRECATED encodeASN1s "use stream types with encodeASN1Stream" #-}
+encodeASN1s :: [ASN1t] -> L.ByteString
+encodeASN1s = BER.encodeASN1s
 
-encodeASN1s :: [ASN1] -> L.ByteString
-encodeASN1s = runPut . encodeASN1sPut
+{-# DEPRECATED encodeASN1 "use stream types with encodeASN1Stream" #-}
+encodeASN1 :: ASN1t -> L.ByteString
+encodeASN1 = BER.encodeASN1

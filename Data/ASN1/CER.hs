@@ -12,29 +12,17 @@ module Data.ASN1.CER
 	, ASN1(..)
 
 	-- * CER serial functions
-	, decodeASN1Get
+	, decodeASN1s
+	, encodeASN1s
 	, decodeASN1
-	, encodeASN1Put
 	, encodeASN1
 	) where
 
 import Data.ASN1.Raw
 import Data.ASN1.Prim
-import Data.Binary.Get
-import Data.Binary.Put
+import Data.ASN1.Types (ASN1t)
 import qualified Data.ASN1.BER as BER
-import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as L
-import Data.Text.Lazy.Encoding (encodeUtf8, encodeUtf32BE)
-
-{- | check if the value is bounded by CER policies -}
-check :: (ASN1Class, Bool, ASN1Tag) -> ASN1Length -> Maybe ASN1Err
-check (_, _, _) _ = Nothing
-
-{- | ofRaw same as BER.ofRAW but check some additional CER constraint. -}
-ofRaw :: Value -> Either ASN1Err ASN1
-ofRaw v = BER.ofRaw v
-
 
 {-
 - 9.2        String encoding forms
@@ -43,6 +31,7 @@ require no more than 1000 contents octets, and as a constructed encoding otherwi
 The string fragments contained in the constructed encoding shall be encoded with a primitive encoding.
 The encoding of each fragment, except possibly the last, shall have 1000 contents octets.
 -}
+{-
 putStringCER :: Int -> L.ByteString -> ValStruct
 putStringCER tn l =
 	if L.length l > 1000
@@ -56,38 +45,20 @@ putStringCER tn l =
 					x1 : repack1000 x2
 				else
 					[ x ]
+-}
 
-{- | toRaw create a CER encoded value ready -}
-toRaw :: ASN1 -> Value
-toRaw (BitString i bits)     = Value Universal 0x3 (putBitString i bits)
-toRaw (OctetString b)        = Value Universal 0x4 (putStringCER 0x4 b)
-toRaw (UTF8String b)         = Value Universal 0xc (putStringCER 0xc (encodeUtf8 b))
-toRaw (NumericString b)      = Value Universal 0x12 (putStringCER 0x12 b)
-toRaw (PrintableString b)    = Value Universal 0x13 (putStringCER 0x13 (encodeUtf8 b))
-toRaw (T61String b)          = Value Universal 0x14 (putStringCER 0x14 b)
-toRaw (VideoTexString b)     = Value Universal 0x15 (putStringCER 0x15 b)
-toRaw (IA5String b)          = Value Universal 0x16 (putStringCER 0x16 (encodeUtf8 b))
-toRaw (GraphicString b)      = Value Universal 0x19 (putStringCER 0x19 b)
-toRaw (VisibleString b)      = Value Universal 0x1a (putStringCER 0x1a b)
-toRaw (GeneralString b)      = Value Universal 0x1b (putStringCER 0x1b b)
-toRaw (UniversalString b)    = Value Universal 0x1c (putStringCER 0x1c (encodeUtf32BE b))
-toRaw (BMPString b)          = Value Universal 0x1e (putStringCER 0x1e (encodeUCS2BE b))
-toRaw v                      = BER.toRaw v
+{-# DEPRECATED decodeASN1s "use stream types with decodeASN1Stream" #-}
+decodeASN1s :: L.ByteString -> Either ASN1Err [ASN1t]
+decodeASN1s = BER.decodeASN1s
 
-decodeASN1Get :: Get (Either ASN1Err ASN1)
-decodeASN1Get = runGetErrInGet (getValueCheck check) >>= return . either Left ofRaw
+{-# DEPRECATED decodeASN1 "use stream types with decodeASN1Stream" #-}
+decodeASN1 :: L.ByteString -> Either ASN1Err ASN1t
+decodeASN1 = BER.decodeASN1
 
-decodeASN1 :: L.ByteString -> Either ASN1Err ASN1
-decodeASN1 b = either Left ofRaw $ runGetErr (getValueCheck check) b
+{-# DEPRECATED encodeASN1s "use stream types with encodeASN1Stream" #-}
+encodeASN1s :: [ASN1t] -> L.ByteString
+encodeASN1s = BER.encodeASN1s
 
-encodePolicyCER :: Value -> Int -> ASN1Length
-encodePolicyCER (Value _ _ (Primitive _)) len
-	| len < 0x80   = LenShort len
-	| otherwise    = LenLong 0 len
-encodePolicyCER (Value _ _ (Constructed _)) _ = LenIndefinite
-
-encodeASN1Put :: ASN1 -> Put
-encodeASN1Put d = putValuePolicy encodePolicyCER $ toRaw d
-
-encodeASN1 :: ASN1 -> L.ByteString
-encodeASN1 = runPut . encodeASN1Put
+{-# DEPRECATED encodeASN1 "use stream types with encodeASN1Stream" #-}
+encodeASN1 :: ASN1t -> L.ByteString
+encodeASN1 = BER.encodeASN1

@@ -22,15 +22,19 @@ Flag test
 
 Library
   Build-Depends:     base >= 3 && < 7,
-                     binary >= 0.5,
                      bytestring,
                      text >= 0.11,
+                     enumerator >= 0.4 && < 0.5,
+                     attoparsec >= 0.8 && < 0.9,
+                     attoparsec-enumerator,
                      mtl
   Exposed-modules:   Data.ASN1.BER
                      Data.ASN1.CER
                      Data.ASN1.DER
                      Data.ASN1.Raw
   other-modules:     Data.ASN1.Prim
+                     Data.ASN1.Stream
+                     Data.ASN1.Types
                      Data.ASN1.Internal
   ghc-options:       -Wall
 

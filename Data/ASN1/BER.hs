@@ -11,123 +11,122 @@ module Data.ASN1.BER
 	( ASN1Class(..)
 	, ASN1(..)
 
-	-- * BER interface when using directly Raw objects
-	, ofRaw
-	, toRaw
-
+	, parseEvents
+	, writeEvents
+	, iterateFile
+	, iterateByteString
 	-- * BER serial functions
-	, decodeASN1Get
-	, decodeASN1State
+	, decodeASN1Stream
+	, encodeASN1Stream
 	, decodeASN1
 	, decodeASN1s
-	, encodeASN1Put
-	, encodeASN1sPut
 	, encodeASN1
 	, encodeASN1s
 	) where
 
-import Data.Int
-import Data.ASN1.Raw
+import Data.ASN1.Raw (ASN1Header(..), ASN1Class(..), ASN1Err(..))
+import qualified Data.ASN1.Raw as Raw
+
+import Data.ASN1.Stream
+import Data.ASN1.Types (ofStream, toStream, ASN1t)
 import Data.ASN1.Prim
-import Data.Either
-import Data.Binary.Get
-import Data.Binary.Put
-import Control.Monad (liftM)
-import Control.Monad.Error (throwError)
+
+import Control.Monad.Error
+import Control.Monad.Identity
+import Control.Exception
+
 import qualified Data.ByteString.Lazy as L
-import qualified Data.ByteString as B
-import Data.Text.Lazy.Encoding (encodeUtf8, encodeUtf32BE)
+import Data.ByteString (ByteString)
 
-ofRaws :: [Value] -> Either ASN1Err [ASN1]
-ofRaws x = if l == [] then Right r else Left $ ASN1Multiple l
-	where
-		(l, r) = partitionEithers $ map ofRaw x
+import Data.Enumerator.IO
+import Data.Enumerator (Iteratee(..), Enumeratee, ($$))
+import qualified Data.Enumerator as E
 
-ofRaw :: Value -> Either ASN1Err ASN1
-ofRaw (Value Universal 0x0 (Primitive b))    = getEOC b
-ofRaw (Value Universal 0x1 (Primitive b))    = getBoolean False b
-ofRaw (Value Universal 0x2 (Primitive b))    = getInteger b
-ofRaw (Value Universal 0x3 v)                = getBitString v
-ofRaw (Value Universal 0x4 v)                = getOctetString v
-ofRaw (Value Universal 0x5 (Primitive b))    = getNull b
-ofRaw (Value Universal 0x6 (Primitive b))    = getOID b
-ofRaw (Value Universal 0x7 (Primitive _))    = Left $ ASN1NotImplemented "Object Descriptor"
-ofRaw (Value Universal 0x8 (Constructed _))  = Left $ ASN1NotImplemented "External"
-ofRaw (Value Universal 0x9 (Primitive _))    = Left $ ASN1NotImplemented "real"
-ofRaw (Value Universal 0xa (Primitive _))    = Left $ ASN1NotImplemented "enumerated"
-ofRaw (Value Universal 0xb (Constructed _))  = Left $ ASN1NotImplemented "EMBEDDED PDV"
-ofRaw (Value Universal 0xc v)                = getUTF8String v
-ofRaw (Value Universal 0xd (Primitive _))    = Left $ ASN1NotImplemented "RELATIVE-OID"
-ofRaw (Value Universal 0x10 (Constructed l)) = either Left (Right . Sequence) $ ofRaws l
-ofRaw (Value Universal 0x11 (Constructed l)) = either Left (Right . Set) $ ofRaws l
-ofRaw (Value Universal 0x12 v)               = getNumericString v
-ofRaw (Value Universal 0x13 v)               = getPrintableString v
-ofRaw (Value Universal 0x14 v)               = getT61String v
-ofRaw (Value Universal 0x15 v)               = getVideoTexString v
-ofRaw (Value Universal 0x16 v)               = getIA5String v
-ofRaw (Value Universal 0x17 x)               = getUTCTime x
-ofRaw (Value Universal 0x18 x)               = getGeneralizedTime x
-ofRaw (Value Universal 0x19 x)               = getGraphicString x
-ofRaw (Value Universal 0x1a x)               = getVisibleString x
-ofRaw (Value Universal 0x1b x)               = getGeneralString x
-ofRaw (Value Universal 0x1c x)               = getUniversalString x
-ofRaw (Value Universal 0x1d x)               = getCharacterString x
-ofRaw (Value Universal 0x1e x)               = getBMPString x
-ofRaw (Value tc tn (Primitive b))            = Right $ Other tc tn (Left b)
-ofRaw (Value tc tn (Constructed l))          = either Left (Right . Other tc tn . Right) $ ofRaws l
+decodeConstruction :: ASN1Header -> ConstructionType
+decodeConstruction (ASN1Header Universal 0x10 _ _) = Sequence
+decodeConstruction (ASN1Header Universal 0x11 _ _) = Set
+decodeConstruction (ASN1Header c t _ _)            = Container c t
 
-toRaw :: ASN1 -> Value
-toRaw EOC                    = Value Universal 0x0 (Primitive B.empty)
-toRaw (Boolean v)            = Value Universal 0x1 (Primitive $ B.singleton (if v then 0xff else 0))
-toRaw (IntVal i)             = Value Universal 0x2 (putInteger i)
-toRaw (BitString i bits)     = Value Universal 0x3 (putBitString i bits)
-toRaw (OctetString b)        = Value Universal 0x4 (putString b)
-toRaw Null                   = Value Universal 0x5 (Primitive B.empty)
-toRaw (OID oid)              = Value Universal 0x6 (putOID oid)
-toRaw (Real _)               = Value Universal 0x9 (Constructed []) -- not implemented
-toRaw Enumerated             = Value Universal 0xa (Constructed []) -- not implemented
-toRaw (UTF8String b)         = Value Universal 0xc (putString $ encodeUtf8 b)
-toRaw (Sequence children)    = Value Universal 0x10 (Constructed $ map toRaw children)
-toRaw (Set children)         = Value Universal 0x11 (Constructed $ map toRaw children)
-toRaw (NumericString b)      = Value Universal 0x12 (putString b)
-toRaw (PrintableString b)    = Value Universal 0x13 (putString $ encodeUtf8 b)
-toRaw (T61String b)          = Value Universal 0x14 (putString b)
-toRaw (VideoTexString b)     = Value Universal 0x15 (putString b)
-toRaw (IA5String b)          = Value Universal 0x16 (putString $ encodeUtf8 b)
-toRaw (UTCTime time)         = Value Universal 0x17 (putUTCTime time)
-toRaw (GeneralizedTime time) = Value Universal 0x18 (putGeneralizedTime time)
-toRaw (GraphicString b)      = Value Universal 0x19 (putString b)
-toRaw (VisibleString b)      = Value Universal 0x1a (putString b)
-toRaw (GeneralString b)      = Value Universal 0x1b (putString b)
-toRaw (UniversalString b)    = Value Universal 0x1c (putString $ encodeUtf32BE b)
-toRaw (CharacterString b)    = Value Universal 0x1d (putString b)
-toRaw (BMPString b)          = Value Universal 0x1e (putString $ encodeUCS2BE b)
-toRaw (Other tc tn c)        = Value tc tn (either Primitive (Constructed . map toRaw) c)
+parseEvents :: Monad m => [ASN1] -> Enumeratee Raw.ASN1Event ASN1 m a
+parseEvents l (E.Continue k) = do
+	x <- E.head
+	case x of
+		Nothing -> return $ E.Continue k
+		Just Raw.ConstructionEnd -> do
+			newStep <- lift $ E.runIteratee $ k $ E.Chunks [head l]
+			parseEvents (tail l) newStep
+		Just (Raw.Header hdr@(ASN1Header _ _ True _)) -> do
+			z <- E.head
+			let ctype = decodeConstruction hdr
+			newStep <- case z of
+				Nothing                    -> error "partial construction got EOF"
+				Just Raw.ConstructionBegin -> do
+					lift $ runIteratee $ k $ E.Chunks [Start ctype]
+				Just _                     -> error "expecting construction"
+			parseEvents (End ctype : l) newStep
+		Just (Raw.Header hdr@(ASN1Header _ _ False _)) -> do
+			z <- E.head
+			newStep <- case z of
+				Nothing -> error "header without a primitive"
+				Just (Raw.Primitive p) -> do
+					let (Right pr) = decodePrimitive hdr p
+					lift $ runIteratee $ k $ E.Chunks [pr]
+				Just _ -> error "expecting primitive"
+			parseEvents l newStep
+		Just _ -> do
+			newStep <- lift $ runIteratee $ k $ E.Chunks []
+			parseEvents l newStep
 
-decodeASN1Get :: Get (Either ASN1Err ASN1)
-decodeASN1Get = either Left ofRaw `fmap` runGetErrInGet getValue
+parseEvents _ step = return step
 
-decodeASN1State :: L.ByteString -> Either ASN1Err (ASN1, L.ByteString, Int64)
-decodeASN1State b =
-	runGetErrState (getValue >>= either throwError return . ofRaw) b 0
+writeEvents :: Monad m => Enumeratee ASN1 Raw.ASN1Event m a
+writeEvents (E.Continue k) = do
+	x <- E.head
+	case x of
+		Nothing         -> return $ E.Continue k
+		Just (Start ty) -> do
+			newStep <- lift $ E.runIteratee $ k $ E.Chunks []
+			writeEvents newStep
+		Just p          -> do
+			let (h, b) = encodePrimitive p
+			newStep <- lift $ E.runIteratee $ k $ E.Chunks [ Raw.Header h, Raw.Primitive b ]
+			writeEvents newStep
 
-decodeASN1 :: L.ByteString -> Either ASN1Err ASN1
-decodeASN1 = either Left ofRaw . runGetErr getValue
+writeEvents step           = return step
 
-decodeASN1s :: L.ByteString -> Either ASN1Err [ASN1]
-decodeASN1s = loop where
-	loop z = case decodeASN1State z of
-		Left err -> throwError err
-		Right (v, rest, _) -> if L.length rest > 0 then liftM (v :) (loop rest) else return [v]
+{-| iterate over a file using a file enumerator. -}
+iterateFile :: FilePath -> Iteratee ASN1 IO a -> IO (Either SomeException a)
+iterateFile path p = E.run (enumFile path $$ E.joinI $ Raw.parseBytes $$ E.joinI $ parseEvents [] $$ p)
 
-encodeASN1Put :: ASN1 -> Put
-encodeASN1Put = putValue . toRaw
+{-| iterate over a bytestring using a list enumerator over each chunks -}
+iterateByteString :: Monad m => L.ByteString -> Iteratee ASN1 m a -> m (Either SomeException a)
+iterateByteString bs p = E.run (E.enumList 1 (L.toChunks bs) $$ E.joinI $ Raw.parseBytes $$ E.joinI $ parseEvents [] $$ p) 
 
-encodeASN1sPut :: [ASN1] -> Put
-encodeASN1sPut = mapM_ encodeASN1Put
+{-| decode a lazy bytestring as an ASN1 stream -}
+decodeASN1Stream :: L.ByteString -> Either ASN1Err [ASN1]
+decodeASN1Stream l = do
+	r <- iterateByteString l E.consume
+	case r of
+		Left _  -> Left ASN1ParsingFail
+		Right x -> Right x
 
-encodeASN1 :: ASN1 -> L.ByteString
-encodeASN1 = runPut . encodeASN1Put
+encodeASN1Stream :: Monad m => [ASN1] -> Iteratee ByteString m a -> m (Either SomeException a)
+encodeASN1Stream l p = E.run (E.enumList 1 l $$ E.joinI $ writeEvents $$ E.joinI $ Raw.writeBytes $$ p)
 
-encodeASN1s :: [ASN1] -> L.ByteString
-encodeASN1s = runPut . encodeASN1sPut
+{-# DEPRECATED decodeASN1s "use stream types with decodeASN1Stream" #-}
+decodeASN1s :: L.ByteString -> Either ASN1Err [ASN1t]
+decodeASN1s l = either (Left) (Right . ofStream) $ decodeASN1Stream l
+
+{-# DEPRECATED decodeASN1 "use stream types with decodeASN1Stream" #-}
+decodeASN1 :: L.ByteString -> Either ASN1Err ASN1t
+decodeASN1 = either (Left) (Right . head) . decodeASN1s
+
+{-# DEPRECATED encodeASN1s "use stream types with encodeASN1Stream" #-}
+encodeASN1s :: [ASN1t] -> L.ByteString
+encodeASN1s l = case runIdentity (encodeASN1Stream (toStream l) E.consume) of
+	Left err -> error "encoding failed"
+	Right x  -> L.fromChunks x
+
+{-# DEPRECATED encodeASN1 "use stream types with encodeASN1Stream" #-}
+encodeASN1 :: ASN1t -> L.ByteString
+encodeASN1 = encodeASN1s . (:[])

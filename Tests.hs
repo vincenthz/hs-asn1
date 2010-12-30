@@ -1,20 +1,67 @@
+--{-# LANGUAGE FlexibleInstances, OverlappingInstances #-}
+
 import Test.QuickCheck
 import Text.Printf
 
 import Data.ASN1.Raw
-import Data.ASN1.DER (ASN1(..))
+import Data.ASN1.Types (ASN1t(..))
 import qualified Data.ASN1.DER as DER
+import qualified Data.ASN1.BER as BER
 
-import Data.Binary.Get
-import Data.Binary.Put
 import Data.Word
 
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as L
 import qualified Data.Text.Lazy as T
+import qualified Data.Enumerator as E
+import Data.Enumerator (($$))
 
 import Control.Monad
+import Control.Monad.Identity
 import System.IO
+
+instance Arbitrary ASN1Class where
+	arbitrary = elements [ Universal, Application, Context, Private ]
+
+
+instance Arbitrary ASN1Length where
+	arbitrary = do
+		c <- choose (0,2) :: Gen Int
+		case c of
+			0 -> liftM LenShort (choose (0,0x79))
+			1 -> do
+				nb <- choose (0x80,0x10000)
+				return $ LenLong (nbBytes nb) nb
+			_ -> return LenIndefinite
+		where
+			nbBytes nb = if nb > 255 then 1 + nbBytes (nb `div` 256) else 1
+
+arbitraryDefiniteLength :: Gen ASN1Length
+arbitraryDefiniteLength = arbitrary `suchThat` (\l -> l /= LenIndefinite)
+
+arbitraryTag :: Gen ASN1Tag
+arbitraryTag = choose(0,10000)
+
+instance Arbitrary ASN1Header where
+	arbitrary = liftM4 ASN1Header arbitrary arbitraryTag arbitrary arbitrary
+
+arbitraryEvents :: Gen ASN1Events
+arbitraryEvents = do
+	hdr@(ASN1Header _ _ _ len) <- liftM4 ASN1Header arbitrary arbitraryTag (return False) arbitraryDefiniteLength
+	let blen = case len of
+		LenLong _ x -> x
+		LenShort x  -> x
+		_           -> 0
+	pr <- liftM Primitive (arbitraryBSsized blen)
+	return (ASN1Events [Header hdr, pr])
+
+newtype ASN1Events = ASN1Events [ASN1Event]
+
+instance Show ASN1Events where
+	show (ASN1Events x) = show x
+
+instance Arbitrary ASN1Events where
+	arbitrary = arbitraryEvents
 
 arbitraryOID :: Gen [Integer]
 arbitraryOID = do
@@ -24,11 +71,16 @@ arbitraryOID = do
 	l   <- replicateM ran (suchThat arbitrary (\i -> i > 0))
 	return (i1:i2:l)
 
+
+arbitraryBSsized :: Int -> Gen B.ByteString
+arbitraryBSsized len = do
+	ws <- replicateM len (choose (0, 255) :: Gen Int)
+	return $ B.pack $ map fromIntegral ws
+
 instance Arbitrary B.ByteString where
 	arbitrary = do
 		len <- choose (0, 529) :: Gen Int
-		ws <- replicateM len (choose (0, 255) :: Gen Int)
-		return $ B.pack $ map fromIntegral ws
+		arbitraryBSsized len
 
 instance Arbitrary L.ByteString where
 	arbitrary = do
@@ -41,22 +93,6 @@ instance Arbitrary T.Text where
 		len <- choose (0, 529) :: Gen Int
 		ws <- replicateM len arbitrary
 		return $ T.pack ws
-
-instance Arbitrary ASN1Class where
-	arbitrary = elements [ Universal, Application, Context, Private ]
-
-arbitraryValueList = choose (0,20) >>= \len -> replicateM len (suchThat arbitrary (not . isConstructed))
-	where
-		isConstructed (Value _ _ (Constructed _)) = True
-		isConstructed _                           = False
-
-instance Arbitrary ValStruct where
-	arbitrary = oneof
-		[ liftM Primitive arbitrary
-		, liftM Constructed arbitraryValueList ]
-
-instance Arbitrary Value where
-	arbitrary = liftM3 Value arbitrary (suchThat arbitrary (\i -> i > 0)) arbitrary
 
 arbitraryTime = do
 	y <- choose (1951, 2050)
@@ -83,10 +119,9 @@ arbitraryIA5String = do
 	x <- replicateM 21 (elements $ map toEnum [0..127])
 	return $ T.pack x
 
-instance Arbitrary ASN1 where
+instance Arbitrary ASN1t where
 	arbitrary = oneof
-		[ return EOC
-		, liftM Boolean arbitrary
+		[ liftM Boolean arbitrary
 		, liftM IntVal arbitrary
 		, liftM2 BitString (choose (0,7)) arbitrary
 		, liftM OctetString arbitrary
@@ -110,13 +145,17 @@ instance Arbitrary ASN1 where
 		, liftM UniversalString arbitrary
 		]
 
-prop_value_marshalling_id :: Value -> Bool
-prop_value_marshalling_id v = (getVal . putVal) v == Right v
-	where
-		getVal = runGetErr getValue
-		putVal = runPut . putValue
+prop_header_marshalling_id :: ASN1Header -> Bool
+prop_header_marshalling_id v = (getHeader . putHeader) v == Right v
 
-prop_asn1_marshalling_id :: ASN1 -> Bool
+prop_event_marshalling_id :: ASN1Events -> Bool
+prop_event_marshalling_id (ASN1Events e) =
+	let r = runIdentity $ E.run (E.enumList 1 e $$ E.joinI $ writeBytes $$ E.joinI $ parseBytes $$ E.consume) in
+	case r of
+		Left _  -> False
+		Right z -> e == z
+
+prop_asn1_marshalling_id :: ASN1t -> Bool
 prop_asn1_marshalling_id v = (DER.decodeASN1 . DER.encodeASN1) v == Right v
 
 args = stdArgs
@@ -129,5 +168,6 @@ args = stdArgs
 run_test n t = putStr ("  " ++ n ++ " ... ") >> hFlush stdout >> quickCheckWith args t
 
 main = do
-	run_test "marshalling value = id" prop_value_marshalling_id
+	run_test "marshalling header = id" prop_header_marshalling_id
+	run_test "marshalling event = id" prop_event_marshalling_id
 	run_test "marshalling asn1 = id" prop_asn1_marshalling_id

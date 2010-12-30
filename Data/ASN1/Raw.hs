@@ -1,4 +1,4 @@
-{-#  LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE BangPatterns #-}
 -- |
 -- Module      : Data.ASN1.Raw
 -- License     : BSD-style
@@ -8,38 +8,42 @@
 --
 -- A module containing raw ASN1 serialization/derialization tools
 --
+
 module Data.ASN1.Raw
-	( GetErr
-	-- * get structure
-	, runGetErr
-	, runGetErrState
-	, runGetErrInGet
+	(
 	-- * ASN1 definitions
-	, ASN1Err(..)
-	, CheckFn
-	, ASN1Class(..)
+	  ASN1Class(..)
 	, ASN1Tag
 	, ASN1Length(..)
-	, ValStruct(..)
-	, Value(..)
-	-- * get value from a Get structure
-	, getValueCheck
-	, getValue
-	-- * put value in a Put structure
-	, putValuePolicy
-	, putValue
+	, ASN1Header(..)
+	, ASN1Err(..)
+	-- * Enumerator events
+	, ASN1Event(..)
+	, iterateFile
+	, iterateByteString
+	, parseBytes
+	, writeBytes
+	-- * serialize asn1 headers
+	, getHeader
+	, putHeader
 	) where
 
-import Data.Bits
-import Data.Int
-import Data.ASN1.Internal
-import Data.Binary.Get
-import Data.Binary.Put
+import Data.Enumerator hiding (head, length, map)
+import qualified Data.Enumerator as E
+import Data.Enumerator.IO
+import Data.Attoparsec.Enumerator
+import Data.Attoparsec
+import qualified Data.Attoparsec as A
 import Data.ByteString (ByteString)
-import Data.Word
-import Control.Monad.Error
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as L
+import Data.ASN1.Internal
+import Control.Exception
+import Data.Word
+import Data.Bits
+import Control.Monad
+import Control.Monad.Trans (lift)
+import Control.Applicative ((<|>), (<$>))
 
 data ASN1Class =
 	  Universal
@@ -48,22 +52,23 @@ data ASN1Class =
 	| Private
 	deriving (Show,Eq,Ord,Enum)
 
+type ASN1Tag = Int
+
 data ASN1Length =
 	  LenShort Int      -- ^ Short form with only one byte. length has to be < 127.
 	| LenLong Int Int   -- ^ Long form of N bytes
 	| LenIndefinite     -- ^ Length is indefinite expect an EOC in the stream to finish the type
-	deriving (Show, Eq)
+	deriving (Show,Eq)
 
-type ASN1Tag = Int
-type Identifier = (ASN1Class, Bool, ASN1Tag)
+data ASN1Header = ASN1Header !ASN1Class !ASN1Tag !Bool !ASN1Length
+	deriving (Show,Eq)
 
-data ValStruct =
-	  Primitive ByteString -- ^ Primitive of a strict value
-	| Constructed [Value]  -- ^ Constructed of a list of values
-	deriving (Show, Eq)
-
-data Value = Value ASN1Class ASN1Tag ValStruct
-	deriving (Show, Eq)
+data ASN1Event =
+	  Header ASN1Header     -- ^ ASN1 Header
+	| Primitive !ByteString -- ^ Primitive
+	| ConstructionBegin     -- ^ Constructed value start
+	| ConstructionEnd       -- ^ Constructed value end
+	deriving (Show,Eq)
 
 data ASN1Err =
 	  ASN1LengthDecodingLongContainsZero
@@ -71,81 +76,146 @@ data ASN1Err =
 	| ASN1NotImplemented String
 	| ASN1Multiple [ASN1Err]
 	| ASN1Misc String
+	| ASN1ParsingPartial
+	| ASN1ParsingFail
 	deriving (Show, Eq)
 
-type CheckFn = (ASN1Class, Bool, ASN1Tag) -> ASN1Length -> Maybe ASN1Err
+{-| iterate over a file using a file enumerator. -}
+iterateFile :: FilePath -> Iteratee ASN1Event IO a -> IO (Either SomeException a)
+iterateFile path p = run (enumFile path $$ joinI (parseBytes $$ p))
 
-instance Error ASN1Err where
-	noMsg = ASN1Misc ""
-	strMsg = ASN1Misc
+{-| iterate over a lazy bytestring using a list enumerator over the bytestring chunks. -}
+iterateByteString :: Monad m => L.ByteString -> Iteratee ASN1Event m a -> m (Either SomeException a)
+iterateByteString bs p = run (enumList 1 (L.toChunks bs) $$ joinI (parseBytes $$ p))
 
-newtype GetErr a = GE { runGE :: ErrorT ASN1Err Get a }
-	deriving (Monad, MonadError ASN1Err)
+{- parse state machine -}
+data ParseState =
+	  PSPrimitive Int
+	| PSConstructing Int
+	| PSConstructingEOC
 
-instance Functor GetErr where
-	fmap f = GE . fmap f . runGE
-
-runGetErr :: GetErr a -> L.ByteString -> Either ASN1Err a
-runGetErr = runGet . runErrorT . runGE
-
-runGetErrState :: GetErr a -> L.ByteString -> Int64 -> Either ASN1Err (a, L.ByteString, Int64)
-runGetErrState g l o =
-	case runGetState (runErrorT $ runGE g) l o of
-		(Left err, _, _)           -> Left err
-		(Right v, datarem, parsed) -> Right (v, datarem, parsed)
-
-runGetErrInGet :: GetErr a -> Get (Either ASN1Err a)
-runGetErrInGet = runErrorT . runGE
-
-liftGet :: Get a -> GetErr a
-liftGet = GE . lift
-
-geteWord8 :: GetErr Word8
-geteWord8 = liftGet getWord8
-
-geteBytes :: Int -> GetErr ByteString
-geteBytes = liftGet . getBytes
-
-{- marshall helper for getIdentifier to unserialize long tag number -}
-getTagLong :: GetErr ASN1Tag
-getTagLong = getNext 0 True
-	where getNext n nz = do
-		t <- fromIntegral `fmap` geteWord8
-		when (nz && t == 0x80) $ throwError ASN1LengthDecodingLongContainsZero
-		if testBit t 7
-			then getNext (n `shiftL` 7 + clearBit t 7) False
-			else return (n `shiftL` 7 + t)
-
-{- marshall helper for putIdentifier to serialize long tag number -}
-putTagLong :: ASN1Tag -> Put
-putTagLong n = mapM_ putWord8 $ revSethighbits $ split7bits n
+{-| parseBytes parse bytestring and generate asn1event. -}
+parseBytes :: Monad m => Enumeratee ByteString ASN1Event m a
+parseBytes = checkDone $ \k -> k (Chunks []) >>== loop [0] []
 	where
-		revSethighbits :: [Word8] -> [Word8]
-		revSethighbits []     = []
-		revSethighbits (x:xs) = reverse $ (x : map (\i -> setBit i 7) xs)
-		split7bits i
-			| i == 0    = []
-			| i <= 0x7f = [ fromIntegral i ]
-			| otherwise = fromIntegral (i .&. 0x7f) : split7bits (i `shiftR` 7)
-		
+		loop !cs !ps = checkDone (go cs ps)
+		go (n:[]) [] k = iterDesc >>= eofCheck k
+				(\(c,e,nps) -> case nps of
+					PSPrimitive _ -> k (Chunks [e]) >>== loop [c+n] [nps]
+					_             -> k (Chunks [e, ConstructionBegin]) >>== loop [0, c+n] [nps]
+				)
 
-{- | getIdentifier get an ASN1 encoded Identifier.
- - if the first 5 bytes value is less than 1f then it's encoded on 1 byte, otherwise
- - read bytes until the 8th bit is not set -}
-getIdentifier :: GetErr Identifier
-getIdentifier = do
-	w <- geteWord8
-	let cl = toEnum $ fromIntegral $ w `shiftR` 6
-	let pc = (w .&. 0x20) > 0
-	let val = fromIntegral (w .&. 0x1f)
-	vencoded <- if val < 0x1f then return val else getTagLong
-	return (cl, pc, vencoded)
+		go (n:cs) (PSPrimitive i:pss) k =
+			iterPrim i >>= (\e -> k (Chunks [e]) >>== loop (n+i:cs) pss)
 
-{- put first word of a header -}
-putIdentifier :: Identifier -> Put
-putIdentifier (cl, pc, tag) = do
-	putWord8 $ putFirstWord (cl, pc, if tag < 0x1f then tag else 0x1f)
-	when (tag >= 0x1f) $ putTagLong tag
+		go (n:m:cs) fps@(PSConstructing i:pss) k
+			| n == i    = k (Chunks [ConstructionEnd]) >>== loop (n+m:cs) pss
+			| otherwise = iterDesc >>= eofCheck k
+				(\(c, e, nps) -> case nps of
+					PSPrimitive _ -> k (Chunks [e]) >>== loop (n+c:m:cs) (nps:fps)
+					_             -> k (Chunks [e, ConstructionBegin]) >>== loop (0:n+c:m:cs) (nps:fps)
+				)
+
+		go (n:m:cs) fps@(PSConstructingEOC:pss) k =
+			iterDesc >>= eofCheck k
+				(\(c, e, nps) -> case e of -- check if EOC or continue
+					(Header (ASN1Header _ 0 _ _)) -> k (Chunks [ConstructionEnd]) >>== loop (c+n+m:cs) pss
+					_                             -> k (Chunks [e]) >>== loop (n+c:m:cs) (nps:fps)
+				)
+		-- error case
+		go _ _ k = k (Chunks []) >>== return
+
+		eofCheck k _ Nothing  = k (Chunks []) >>== return
+		eofCheck _ f (Just x) = f $! x
+
+		iterDesc :: Monad m => Iteratee ByteString m (Maybe (Int, ASN1Event, ParseState))
+		iterDesc = iterParser ((endOfInput >> return Nothing) <|> fmap Just parseHeaderEvent)
+
+		iterPrim i = iterParser (fmap (Primitive) (A.take i))
+
+{- parseHeaderEvent returns the asn1event header, the length parsed and the next parse state. -}
+parseHeaderEvent :: Parser (Int, ASN1Event, ParseState)
+parseHeaderEvent = do
+	(lbytes, asn1header@(ASN1Header _ _ pc len)) <- parseHeader
+	let ps = if pc
+		-- constructed value(s)
+		then case len of
+			LenIndefinite -> PSConstructingEOC
+			LenLong _ i   -> PSConstructing i
+			LenShort i    -> PSConstructing i
+		-- primitive value
+		else case len of
+			LenIndefinite -> error "cannot do indefinite primitive"
+			LenLong _ i   -> PSPrimitive i
+			LenShort i    -> PSPrimitive i
+	return (lbytes, Header asn1header, ps)
+
+{- parseHeader parse a asn1 header in an attoparsec context.
+ - it returns the number of bytes parsed, the asn1event for this event -}
+parseHeader :: Parser (Int, ASN1Header)
+parseHeader = do
+	(cl,pc,t1)      <- parseFirstWord <$> anyWord8
+	(tagbytes, tag) <- if t1 == 0x1f then getTagLong else return (0, t1)
+	(lenbytes, len) <- getLength
+	return (1+tagbytes+lenbytes, ASN1Header cl tag pc len)
+
+{- parse an header from a single bytestring. -}
+getHeader :: ByteString -> Either ASN1Err ASN1Header
+getHeader l = case parse parseHeader l of
+	(Fail _ _ _) -> Left ASN1ParsingFail
+	(Partial _)  -> Left ASN1ParsingPartial
+	Done b r     -> if B.null b then Right (snd r) else Left ASN1ParsingPartial
+
+{- parse the first word of an header -}
+parseFirstWord :: Word8 -> (ASN1Class, Bool, ASN1Tag)
+parseFirstWord w = (cl,pc,t1)
+	where
+		cl = toEnum $ fromIntegral $ (w `shiftR` 6)
+		pc = testBit w 5
+		t1 = fromIntegral (w .&. 0x1f)
+
+{- when the first tag is 0x1f, the tag is in long form, where
+ - we get bytes while the 7th bit is set. -}
+getTagLong :: Parser (Int, ASN1Tag)
+getTagLong = do
+	t <- fromIntegral <$> anyWord8
+	when (t == 0x80) $ error "not canonical encoding of tag"
+	if testBit t 7
+		then getNext 1 (clearBit t 7)
+		else return (1, t)
+
+	where getNext !blen !n = do
+		t <- fromIntegral <$> anyWord8
+		if testBit t 7
+			then getNext (blen + 1) (n `shiftL` 7 + clearBit t 7)
+			else return (blen + 1, n `shiftL` 7 + t)
+
+{- get the asn1 length which is either short form if 7th bit is not set,
+ - indefinite form is the 7 bit is set and every other bits clear,
+ - or long form otherwise, where the next bytes will represent the length
+ -}
+getLength :: Parser (Int, ASN1Length)
+getLength = do
+	l1 <- fromIntegral <$> anyWord8
+	if testBit l1 7
+		then case clearBit l1 7 of
+			0   -> return (1, LenIndefinite)
+			len -> do
+				lw <- A.take len
+				return (1+len, LenLong len $ uintbs lw)
+		else
+			return (1, LenShort l1)
+	where
+		{- uintbs return the unsigned int represented by the bytes -}
+		uintbs = B.foldl (\acc n -> (acc `shiftL` 8) + fromIntegral n) 0
+
+{- | putIdentifier encode an ASN1 Identifier into a marshalled value -}
+putHeader :: ASN1Header -> ByteString
+putHeader (ASN1Header cl tag pc len) = B.pack
+	( putFirstWord (cl, pc, if tag < 0x1f then tag else 0x1f)
+	: (if tag >= 0x1f then putTagLong tag else [])
+	++ putLength len
+	)
 
 {- put first word of a header -}
 putFirstWord :: (ASN1Class, Bool, ASN1Tag) -> Word8
@@ -154,109 +224,49 @@ putFirstWord (cl,pc,t1) = (cli `shiftL` 6) .|. (pcval `shiftL` 5) .|. (fromInteg
 		cli   = fromIntegral $ fromEnum cl
 		pcval = if pc then 0x1 else 0x0
 
-{- | getLength get the ASN1 encoded length of an item.
- - if less than 0x80 then it's encoded on 1 byte, otherwise
- - the first byte is the number of bytes to read as the length.
- - if the number of bytes is 0, then the length is indefinite,
- - and the content length is bounded by an EOC -}
-getLength :: GetErr ASN1Length
-getLength = do
-	l1 <- geteWord8
-	if testBit l1 7
-		then case fromIntegral (clearBit l1 7) of
-			0   -> return LenIndefinite
-			len -> do
-				lw <- geteBytes len
-				return $ LenLong len (fromIntegral $ snd $ uintOfBytes lw)
-		else
-			return $ LenShort $ fromIntegral l1
+{- marshall helper for putIdentifier to serialize long tag number -}
+putTagLong :: ASN1Tag -> [Word8]
+putTagLong n = revSethighbits $ split7bits n
+	where
+		revSethighbits :: [Word8] -> [Word8]
+		revSethighbits []     = []
+		revSethighbits (x:xs) = reverse $ (x : map (\i -> setBit i 7) xs)
+		split7bits i
+			| i == 0    = []
+			| i <= 0x7f = [ fromIntegral i ]
+			| otherwise = fromIntegral (i .&. 0x7f) : split7bits (i `shiftR` 7)
 
 {- | putLength encode a length into a ASN1 length.
  - see getLength for the encoding rules -}
-putLength :: ASN1Length -> Put
+putLength :: ASN1Length -> [Word8]
 putLength (LenShort i)
 	| i < 0 || i > 0x7f = error "putLength: short length is not between 0x0 and 0x80"
-	| otherwise         = putWord8 $ fromIntegral i
-
+	| otherwise         = [fromIntegral i]
 putLength (LenLong _ i)
 	| i < 0     = error "putLength: long length is negative"
-	| otherwise = putWord8 lenbytes >> mapM_ putWord8 lw
+	| otherwise = lenbytes : lw
 		where
 			lw       = bytesOfUInt $ fromIntegral i
 			lenbytes = fromIntegral (length lw .|. 0x80)
-	
-putLength (LenIndefinite) = putWord8 0x80
+putLength (LenIndefinite) = [0x80]
 
-{- helper to getValue to build a constructed list of values when length is known -}
-getValueConstructed :: CheckFn -> GetErr [Value]
-getValueConstructed check = do
-	remain <- liftGet remaining
-	if remain > 0
-		then liftM2 (:) (getValueCheck check) (getValueConstructed check)
-		else return []
-
-{- helper to getValue to build a constructed list of values when length is unknown -}
-getValueConstructedUntilEOC :: CheckFn -> GetErr [Value]
-getValueConstructedUntilEOC check = do
-	o <- getValueCheck check
-	case o of
-		-- technically EOC should also match (Primitive B.empty) (LenShort 0)
-		Value Universal 0 _ -> return []
-		_                   -> liftM (o :) (getValueConstructedUntilEOC check)
-
-getValueOfLength :: CheckFn -> Int -> Bool -> GetErr ValStruct
-getValueOfLength check len pc = do
-	b <- geteBytes len
-	if pc
-		then case runGetErr (getValueConstructed check) (L.fromChunks [b]) of
-			Right x  -> return $ Constructed x
-			Left err -> throwError err
-		else
-			return $ Primitive b
-
-{- | getValueCheck decode an ASN1 value and check the values received through the check fn -}
-getValueCheck :: CheckFn -> GetErr Value
-getValueCheck check = do
-	(tc, pc, tn) <- getIdentifier
-	vallen <- getLength
-
-	{- policy checker, if it returns an error, raise it -}
-	case check (tc, pc, tn) vallen of
-		Just err -> throwError err
-		Nothing  -> return ()
-
-	struct <- case vallen of
-		LenIndefinite -> do
-			unless pc $ throwError $ ASN1Misc "lenght indefinite not allowed with primitive"
-			vs <- getValueConstructedUntilEOC check
-			return $ Constructed vs
-		(LenShort len)  -> getValueOfLength check len pc
-		(LenLong _ len) -> getValueOfLength check len pc
-	return $ Value tc tn struct
-
-getValue :: GetErr Value
-getValue = getValueCheck (\_ _ -> Nothing)
-
-putValStruct :: ValStruct -> Put
-putValStruct (Primitive x)   = putByteString x
-putValStruct (Constructed l) = mapM_ putValue l
-
-putValuePolicy :: (Value -> Int -> ASN1Length) -> Value -> Put
-putValuePolicy policy v@(Value tc tn struct) = do
-	let pc =
-		case struct of
-			Primitive _   -> False
-			Constructed _ -> True
-	putIdentifier (tc, pc, tn)
-	let content = runPut (putValStruct struct)
-	let len = fromIntegral $ L.length content 
-	let lenEncoded = policy v len
-	putLength lenEncoded
-	putLazyByteString content
-	case lenEncoded of
-		LenIndefinite -> putValue $ Value Universal 0x0 (Primitive B.empty)
-		_             -> return ()
-
-{- | putValue encode an ASN1 value using the shortest definite length -}
-putValue :: Value -> Put
-putValue = putValuePolicy (\_ len -> if len < 0x80 then LenShort len else LenLong 0 len)
+{-| write Bytes of events enumeratee -}
+writeBytes :: Monad m => Enumeratee ASN1Event ByteString m a
+writeBytes (E.Continue k) = do
+	x <- E.head
+	case x of
+		Nothing                -> return $ E.Continue k
+		Just (Header hdr)      -> do
+			nstep <- lift $ runIteratee $ k $ E.Chunks [putHeader hdr]
+			writeBytes nstep
+		Just (Primitive p)     -> do
+			nstep <- lift $ runIteratee $ k $ E.Chunks [p]
+			writeBytes nstep
+		Just ConstructionBegin -> do
+			nstep <- lift $ runIteratee $ k $ E.Chunks []
+			writeBytes nstep
+		Just ConstructionEnd   -> do
+			-- FIXME need to push an EOC when doing a indefinite block
+			nstep <- lift $ runIteratee $ k $ E.Chunks []
+			writeBytes nstep
+writeBytes step = return step

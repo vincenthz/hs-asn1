@@ -12,9 +12,14 @@ module Data.ASN1.Prim
 	(
 	-- * ASN1 high level algebraic type
 	  ASN1(..)
+	, ConstructionType(..)
+
+	, encodeHeader
+	, encodePrimitiveHeader
+	, encodePrimitive
+	, decodePrimitive
 
 	-- * marshall an ASN1 type from a val struct or a bytestring
-	, getEOC
 	, getBoolean
 	, getInteger
 	, getBitString
@@ -43,14 +48,13 @@ module Data.ASN1.Prim
 	, putBitString
 	, putString
 	, putOID
-	, encodeUCS2BE
 	) where
 
 import Data.ASN1.Internal
 import Data.ASN1.Raw
+import Data.ASN1.Stream
 import Data.Bits
 import Data.Word
-import Data.Maybe (catMaybes)
 import Data.List (unfoldr)
 import Data.ByteString (ByteString)
 import Data.Char (ord)
@@ -58,36 +62,7 @@ import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as L
 import Data.Text.Lazy (Text)
 import qualified Data.Text.Lazy as T
-import Data.Text.Lazy.Encoding (decodeASCII, decodeUtf8, decodeUtf32BE)
-
-data ASN1 =
-	  EOC
-	| Boolean Bool
-	| IntVal Integer
-	| BitString Int L.ByteString
-	| OctetString L.ByteString
-	| Null
-	| OID [Integer]
-	| Real Double
-	| Enumerated
-	| UTF8String Text
-	| Sequence [ASN1]
-	| Set [ASN1]
-	| NumericString L.ByteString
-	| PrintableString Text
-	| T61String L.ByteString
-	| VideoTexString L.ByteString
-	| IA5String Text
-	| UTCTime (Int, Int, Int, Int, Int, Int, Bool)
-	| GeneralizedTime (Int, Int, Int, Int, Int, Int, Bool)
-	| GraphicString L.ByteString
-	| VisibleString L.ByteString
-	| GeneralString L.ByteString
-	| UniversalString Text
-	| CharacterString L.ByteString
-	| BMPString Text
-	| Other ASN1Class ASN1Tag (Either ByteString [ASN1])
-	deriving (Show, Eq)
+import Data.Text.Lazy.Encoding (decodeASCII, decodeUtf8, decodeUtf32BE, encodeUtf8, encodeUtf32BE)
 
 encodeUCS2BE :: Text -> L.ByteString
 encodeUCS2BE t =
@@ -105,11 +80,108 @@ decodeUCS2BE l = T.pack $ loop l
 					_     -> loop r
 	
 
-getEOC :: ByteString -> Either ASN1Err ASN1
-getEOC s =
-	if B.length s == 0
-		then Right $ EOC
-		else Left $ ASN1Misc "EOC: data length not within bound"
+encodeHeader :: Bool -> ASN1Length -> ASN1 -> ASN1Header
+encodeHeader pc len (Boolean _)                = ASN1Header Universal 0x1 pc len
+encodeHeader pc len (IntVal _)                 = ASN1Header Universal 0x2 pc len
+encodeHeader pc len (BitString _ _)            = ASN1Header Universal 0x3 pc len
+encodeHeader pc len (OctetString _)            = ASN1Header Universal 0x4 pc len
+encodeHeader pc len Null                       = ASN1Header Universal 0x5 pc len
+encodeHeader pc len (OID _)                    = ASN1Header Universal 0x6 pc len
+encodeHeader pc len (Real _)                   = ASN1Header Universal 0x9 pc len
+encodeHeader pc len Enumerated                 = ASN1Header Universal 0xa pc len
+encodeHeader pc len (UTF8String _)             = ASN1Header Universal 0xc pc len
+encodeHeader pc len (NumericString _)          = ASN1Header Universal 0x12 pc len
+encodeHeader pc len (PrintableString _)        = ASN1Header Universal 0x13 pc len
+encodeHeader pc len (T61String _)              = ASN1Header Universal 0x14 pc len
+encodeHeader pc len (VideoTexString _)         = ASN1Header Universal 0x15 pc len
+encodeHeader pc len (IA5String _)              = ASN1Header Universal 0x16 pc len
+encodeHeader pc len (UTCTime _)                = ASN1Header Universal 0x17 pc len
+encodeHeader pc len (GeneralizedTime _)        = ASN1Header Universal 0x18 pc len
+encodeHeader pc len (GraphicString _)          = ASN1Header Universal 0x19 pc len
+encodeHeader pc len (VisibleString _)          = ASN1Header Universal 0x1a pc len
+encodeHeader pc len (GeneralString _)          = ASN1Header Universal 0x1b pc len
+encodeHeader pc len (UniversalString _)        = ASN1Header Universal 0x1c pc len
+encodeHeader pc len (CharacterString _)        = ASN1Header Universal 0x1d pc len
+encodeHeader pc len (BMPString _)              = ASN1Header Universal 0x1e pc len
+encodeHeader pc len (Start Sequence)           = ASN1Header Universal 0x10 pc len
+encodeHeader pc len (Start Set)                = ASN1Header Universal 0x11 pc len
+encodeHeader pc len (Start (Container tc tag)) = ASN1Header tc tag pc len
+encodeHeader pc len (Other tc tag _)           = ASN1Header tc tag pc len
+encodeHeader _ _ (End _)                       = error "this should not happen"
+
+encodePrimitiveHeader :: ASN1Length -> ASN1 -> ASN1Header
+encodePrimitiveHeader = encodeHeader False
+
+encodePrimitiveData :: ASN1 -> ByteString
+encodePrimitiveData (Boolean b)         = B.singleton (if b then 0xff else 0)
+encodePrimitiveData (IntVal i)          = putInteger i
+encodePrimitiveData (BitString i bits)  = putBitString i bits
+encodePrimitiveData (OctetString b)     = putString b
+encodePrimitiveData Null                = B.empty
+encodePrimitiveData (OID oid)           = putOID oid
+encodePrimitiveData (Real _)            = B.empty -- not implemented
+encodePrimitiveData Enumerated          = B.empty -- not implemented
+encodePrimitiveData (UTF8String b)      = putString $ encodeUtf8 b
+encodePrimitiveData (NumericString b)   = putString b
+encodePrimitiveData (PrintableString b) = putString $ encodeUtf8 b
+encodePrimitiveData (T61String b)       = putString b
+encodePrimitiveData (VideoTexString b)  = putString b
+encodePrimitiveData (IA5String b)       = putString $ encodeUtf8 b
+encodePrimitiveData (UTCTime t)         = putUTCTime t
+encodePrimitiveData (GeneralizedTime t) = putGeneralizedTime t
+encodePrimitiveData (GraphicString b)   = putString b
+encodePrimitiveData (VisibleString b)   = putString b
+encodePrimitiveData (GeneralString b)   = putString b
+encodePrimitiveData (UniversalString b) = putString $ encodeUtf32BE b
+encodePrimitiveData (CharacterString b) = putString b
+encodePrimitiveData (BMPString b)       = putString $ encodeUCS2BE b
+encodePrimitiveData (Other _ _ b)       = b
+encodePrimitiveData _                   = error "not a primitive"
+
+encodePrimitive :: ASN1 -> (ASN1Header, ByteString)
+encodePrimitive a =
+	let b = encodePrimitiveData a in
+	let len = makeLength (B.length b) in
+	(encodePrimitiveHeader len a, b)
+	where
+		makeLength len
+			| len < 0x80 = LenShort len
+			| otherwise  = LenLong (nbBytes len) len
+		nbBytes nb = if nb > 255 then 1 + nbBytes (nb `div` 256) else 1
+
+type ASN1Ret = Either ASN1Err ASN1
+
+decodePrimitive :: ASN1Header -> B.ByteString -> ASN1Ret
+decodePrimitive (ASN1Header Universal 0x1 _ _) p   = getBoolean False p
+decodePrimitive (ASN1Header Universal 0x2 _ _) p   = getInteger p
+decodePrimitive (ASN1Header Universal 0x3 _ _) p   = getBitString p
+decodePrimitive (ASN1Header Universal 0x4 _ _) p   = getOctetString p
+decodePrimitive (ASN1Header Universal 0x5 _ _) p   = getNull p
+decodePrimitive (ASN1Header Universal 0x6 _ _) p   = getOID p
+decodePrimitive (ASN1Header Universal 0x7 _ _) _   = Left $ ASN1NotImplemented "Object Descriptor"
+decodePrimitive (ASN1Header Universal 0x8 _ _) _   = Left $ ASN1NotImplemented "External"
+decodePrimitive (ASN1Header Universal 0x9 _ _) _   = Left $ ASN1NotImplemented "real"
+decodePrimitive (ASN1Header Universal 0xa _ _) _   = Left $ ASN1NotImplemented "enumerated"
+decodePrimitive (ASN1Header Universal 0xb _ _) _   = Left $ ASN1NotImplemented "EMBEDDED PDV"
+decodePrimitive (ASN1Header Universal 0xc _ _) p   = getUTF8String p
+decodePrimitive (ASN1Header Universal 0xd _ _) _   = Left $ ASN1NotImplemented "RELATIVE-OID"
+decodePrimitive (ASN1Header Universal 0x10 _ _) _  = error "sequence not a primitive"
+decodePrimitive (ASN1Header Universal 0x11 _ _) _  = error "set not a primitive"
+decodePrimitive (ASN1Header Universal 0x12 _ _) p  = getNumericString p
+decodePrimitive (ASN1Header Universal 0x13 _ _) p  = getPrintableString p
+decodePrimitive (ASN1Header Universal 0x14 _ _) p  = getT61String p
+decodePrimitive (ASN1Header Universal 0x15 _ _) p  = getVideoTexString p
+decodePrimitive (ASN1Header Universal 0x16 _ _) p  = getIA5String p
+decodePrimitive (ASN1Header Universal 0x17 _ _) p  = getUTCTime p
+decodePrimitive (ASN1Header Universal 0x18 _ _) p  = getGeneralizedTime p
+decodePrimitive (ASN1Header Universal 0x19 _ _) p  = getGraphicString p
+decodePrimitive (ASN1Header Universal 0x1a _ _) p  = getVisibleString p
+decodePrimitive (ASN1Header Universal 0x1b _ _) p  = getGeneralString p
+decodePrimitive (ASN1Header Universal 0x1c _ _) p  = getUniversalString p
+decodePrimitive (ASN1Header Universal 0x1d _ _) p  = getCharacterString p
+decodePrimitive (ASN1Header Universal 0x1e _ _) p  = getBMPString p
+decodePrimitive (ASN1Header tc        tag  _ _) p  = Right $ Other tc tag p
+
 
 getBoolean :: Bool -> ByteString -> Either ASN1Err ASN1
 getBoolean isDer s =
@@ -135,8 +207,8 @@ getInteger s
 			v2 = s `B.index` 1
 
 
-getBitString :: ValStruct -> Either ASN1Err ASN1
-getBitString (Primitive s) =
+getBitString :: ByteString -> Either ASN1Err ASN1
+getBitString s =
 	let toSkip = B.head s in
 	let toSkip' = if toSkip >= 48 && toSkip <= 48 + 7 then toSkip - (fromIntegral $ ord '0') else toSkip in
 	let xs = B.tail s in
@@ -144,59 +216,49 @@ getBitString (Primitive s) =
 		then Right $ BitString (fromIntegral toSkip') (L.fromChunks [xs])
 		else Left $ ASN1Misc ("bitstring: skip number not within bound " ++ show toSkip' ++ " " ++  show s)
 
-getBitString (Constructed _) = Left $ ASN1NotImplemented "bitstring"
-
-getString :: (Either ByteString Value -> Maybe ASN1Err) -> ValStruct -> Either ASN1Err L.ByteString
-getString check (Primitive s) =
-	case check (Left s) of
+getString :: (ByteString -> Maybe ASN1Err) -> ByteString -> Either ASN1Err L.ByteString
+getString check s =
+	case check s of
 		Nothing  -> Right $ L.fromChunks [s]
 		Just err -> Left err
 
-getString check (Constructed l) =
-	case catMaybes $ map (check . Right) l of
-		[]   -> Right $ L.fromChunks $ map catPrimitiveString l
-		errs -> Left $ ASN1Multiple errs
-	where
-		catPrimitiveString (Value _ _ (Primitive b)) = b
-		catPrimitiveString (Value _ _ (Constructed _)) = B.empty {- FIXME -}
-
-getOctetString :: ValStruct -> Either ASN1Err ASN1
+getOctetString :: ByteString -> Either ASN1Err ASN1
 getOctetString = either Left (Right . OctetString) . getString (\_ -> Nothing)
 
-getNumericString :: ValStruct -> Either ASN1Err ASN1
+getNumericString :: ByteString -> Either ASN1Err ASN1
 getNumericString = either Left (Right . NumericString) . getString (\_ -> Nothing)
 
-getPrintableString :: ValStruct -> Either ASN1Err ASN1
+getPrintableString :: ByteString -> Either ASN1Err ASN1
 getPrintableString = either Left (Right . PrintableString . decodeASCII) . getString (\_ -> Nothing)
 
-getUTF8String :: ValStruct -> Either ASN1Err ASN1
+getUTF8String :: ByteString -> Either ASN1Err ASN1
 getUTF8String = either Left (Right . UTF8String . decodeUtf8) . getString (\_ -> Nothing)
 
-getT61String :: ValStruct -> Either ASN1Err ASN1
+getT61String :: ByteString -> Either ASN1Err ASN1
 getT61String = either Left (Right . T61String) . getString (\_ -> Nothing)
 
-getVideoTexString :: ValStruct -> Either ASN1Err ASN1
+getVideoTexString :: ByteString -> Either ASN1Err ASN1
 getVideoTexString = either Left (Right . VideoTexString) . getString (\_ -> Nothing)
 
-getIA5String :: ValStruct -> Either ASN1Err ASN1
+getIA5String :: ByteString -> Either ASN1Err ASN1
 getIA5String = either Left (Right . IA5String . decodeASCII) . getString (\_ -> Nothing)
 
-getGraphicString :: ValStruct -> Either ASN1Err ASN1
+getGraphicString :: ByteString -> Either ASN1Err ASN1
 getGraphicString = either Left (Right . GraphicString) . getString (\_ -> Nothing)
 
-getVisibleString :: ValStruct -> Either ASN1Err ASN1
+getVisibleString :: ByteString -> Either ASN1Err ASN1
 getVisibleString = either Left (Right . VisibleString) . getString (\_ -> Nothing)
 
-getGeneralString :: ValStruct -> Either ASN1Err ASN1
+getGeneralString :: ByteString -> Either ASN1Err ASN1
 getGeneralString = either Left (Right . GeneralString) . getString (\_ -> Nothing)
 
-getUniversalString :: ValStruct -> Either ASN1Err ASN1
+getUniversalString :: ByteString -> Either ASN1Err ASN1
 getUniversalString = either Left (Right . UniversalString . decodeUtf32BE) . getString (\_ -> Nothing)
 
-getCharacterString :: ValStruct -> Either ASN1Err ASN1
+getCharacterString :: ByteString -> Either ASN1Err ASN1
 getCharacterString = either Left (Right . CharacterString) . getString (\_ -> Nothing)
 
-getBMPString :: ValStruct -> Either ASN1Err ASN1
+getBMPString :: ByteString -> Either ASN1Err ASN1
 getBMPString = either Left (Right . BMPString . decodeUCS2BE) . getString (\_ -> Nothing)
 
 getNull :: ByteString -> Either ASN1Err ASN1
@@ -221,8 +283,8 @@ getOID s = Right $ OID $ (fromIntegral (x `div` 40) : fromIntegral (x `mod` 40) 
 		spanSubOIDbound (a:as) = if testBit a 7 then (clearBit a 7 : ys, zs) else ([a], as)
 			where (ys, zs) = spanSubOIDbound as
 
-getUTCTime :: ValStruct -> Either ASN1Err ASN1
-getUTCTime (Primitive s) =
+getUTCTime :: ByteString -> Either ASN1Err ASN1
+getUTCTime s =
 	case B.unpack s of
 		[y1, y2, m1, m2, d1, d2, h1, h2, mi1, mi2, s1, s2, z] ->
 			let y = integerise y1 y2 in
@@ -237,10 +299,8 @@ getUTCTime (Primitive s) =
 	where
 		integerise a b = ((fromIntegral a) - (ord '0')) * 10 + ((fromIntegral b) - (ord '0'))
 
-getUTCTime (Constructed _) = Left $ ASN1NotImplemented "utctime constructed"
-
-getGeneralizedTime :: ValStruct -> Either ASN1Err ASN1
-getGeneralizedTime (Primitive s) =
+getGeneralizedTime :: ByteString -> Either ASN1Err ASN1
+getGeneralizedTime s =
 	case B.unpack s of
 		[y1, y2, y3, y4, m1, m2, d1, d2, h1, h2, mi1, mi2, s1, s2, z] ->
 			let year = (integerise y1 y2) * 100 + (integerise y3 y4) in
@@ -253,11 +313,9 @@ getGeneralizedTime (Primitive s) =
 		_                                                     -> Left $ ASN1Misc "utctime unexpected format"
 	where
 		integerise a b = ((fromIntegral a) - (ord '0')) * 10 + ((fromIntegral b) - (ord '0'))
-getGeneralizedTime (Constructed _) = Left $ ASN1NotImplemented "generalizedtime constructed"
 
-putTime :: Bool -> (Int, Int, Int, Int, Int, Int, Bool) -> ValStruct
-putTime generalized (y,m,d,h,mi,s,z) =
-	Primitive $ B.pack etime
+putTime :: Bool -> (Int, Int, Int, Int, Int, Int, Bool) -> ByteString
+putTime generalized (y,m,d,h,mi,s,z) = B.pack etime
 	where
 		etime =
 			if generalized
@@ -271,24 +329,24 @@ putTime generalized (y,m,d,h,mi,s,z) =
 		(mi1, mi2)        = split2 mi
 		(s1, s2)          = split2 s
 
-putUTCTime :: (Int, Int, Int, Int, Int, Int, Bool) -> ValStruct
+putUTCTime :: (Int, Int, Int, Int, Int, Int, Bool) -> ByteString
 putUTCTime time = putTime False time
 
-putGeneralizedTime :: (Int, Int, Int, Int, Int, Int, Bool) -> ValStruct
+putGeneralizedTime :: (Int, Int, Int, Int, Int, Int, Bool) -> ByteString
 putGeneralizedTime time = putTime True time
 
-putInteger :: Integer -> ValStruct
-putInteger i = Primitive $ B.pack $ bytesOfInt i
+putInteger :: Integer -> ByteString
+putInteger i = B.pack $ bytesOfInt i
 
-putBitString :: Int -> L.ByteString -> ValStruct
-putBitString i bits = Primitive $ B.concat $ B.singleton (fromIntegral i) : L.toChunks bits
+putBitString :: Int -> L.ByteString -> ByteString
+putBitString i bits = B.concat $ B.singleton (fromIntegral i) : L.toChunks bits
 
-putString :: L.ByteString -> ValStruct
-putString l = Primitive $ B.concat $ L.toChunks l
+putString :: L.ByteString -> ByteString
+putString l = B.concat $ L.toChunks l
 
 {- no enforce check that oid1 is between [0..2] and oid2 is between [0..39] -}
-putOID :: [Integer] -> ValStruct
-putOID oids = Primitive $ B.pack $ eoid
+putOID :: [Integer] -> ByteString
+putOID oids = B.pack $ eoid
 	where
 		(oid1:oid2:suboids) = oids
 		eoidclass           = fromIntegral (oid1 * 40 + oid2)
