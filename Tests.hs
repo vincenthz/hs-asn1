@@ -30,7 +30,7 @@ instance Arbitrary ASN1Length where
 		case c of
 			0 -> liftM LenShort (choose (0,0x79))
 			1 -> do
-				nb <- choose (0x80,0x10000)
+				nb <- choose (0x80,0x1000)
 				return $ LenLong (nbBytes nb) nb
 			_ -> return LenIndefinite
 		where
