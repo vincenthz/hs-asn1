@@ -121,6 +121,30 @@ arbitraryIA5String = do
 	x <- replicateM 21 (elements $ map toEnum [0..127])
 	return $ T.pack x
 
+instance Arbitrary ASN1 where
+	arbitrary = oneof
+		[ liftM Boolean arbitrary
+		, liftM IntVal arbitrary
+		, liftM2 BitString (choose (0,7)) arbitrary
+		, liftM OctetString arbitrary
+		, return Null
+		, liftM OID arbitraryOID
+		--, Real Double
+		-- , return Enumerated
+		, liftM UTF8String arbitrary
+		, liftM NumericString arbitrary
+		, liftM PrintableString arbitraryPrintString
+		, liftM T61String arbitrary
+		, liftM VideoTexString arbitrary
+		, liftM IA5String arbitraryIA5String
+		, liftM UTCTime arbitraryTime
+		, liftM GeneralizedTime arbitraryTime
+		, liftM GraphicString arbitrary
+		, liftM VisibleString arbitrary
+		, liftM GeneralString arbitrary
+		, liftM UniversalString arbitrary
+		]
+
 instance Arbitrary T.ASN1t where
 	arbitrary = oneof
 		[ liftM T.Boolean arbitrary
@@ -157,6 +181,13 @@ prop_event_marshalling_id (ASN1Events e) =
 		Left _  -> False
 		Right z -> e == z
 
+prop_asn1_event_marshalling_id :: ASN1 -> Bool
+prop_asn1_event_marshalling_id x =
+	let r = runIdentity $ E.run (E.enumList 1 [x] $$ E.joinI $ BER.writeEvents $$ E.joinI $ BER.parseEvents $$ E.consume) in
+	case r of
+		Left _  -> False
+		Right z -> [x] == z
+
 prop_asn1_marshalling_id :: T.ASN1t -> Bool
 prop_asn1_marshalling_id v = (DER.decodeASN1 . DER.encodeASN1) v == Right v
 
@@ -172,4 +203,5 @@ run_test n t = putStr ("  " ++ n ++ " ... ") >> hFlush stdout >> quickCheckWith 
 main = do
 	run_test "marshalling header = id" prop_header_marshalling_id
 	run_test "marshalling event = id" prop_event_marshalling_id
-	run_test "marshalling asn1 = id" prop_asn1_marshalling_id
+	run_test "marshalling asn1 stream = id" prop_asn1_event_marshalling_id
+	run_test "marshalling asn1 type = id" prop_asn1_marshalling_id
