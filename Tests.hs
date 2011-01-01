@@ -5,6 +5,7 @@ import Text.Printf
 
 import Data.ASN1.Raw
 import Data.ASN1.Stream (ASN1(..), ConstructionType(..))
+import Data.ASN1.Prim
 import qualified Data.ASN1.Types as T (ASN1t(..))
 import qualified Data.ASN1.DER as DER
 import qualified Data.ASN1.BER as BER
@@ -32,7 +33,7 @@ instance Arbitrary ASN1Length where
 			0 -> liftM LenShort (choose (0,0x79))
 			1 -> do
 				nb <- choose (0x80,0x1000)
-				return $ LenLong (nbBytes nb) nb
+				return $ mkSmallestLength nb
 			_ -> return LenIndefinite
 		where
 			nbBytes nb = if nb > 255 then 1 + nbBytes (nb `div` 256) else 1
