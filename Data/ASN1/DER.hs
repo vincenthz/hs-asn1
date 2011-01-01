@@ -19,6 +19,10 @@ module Data.ASN1.DER
 	, enumReadBytes
 	, enumWriteBytes
 
+	-- * iterate over common representation to an ASN1 stream
+	, iterateFile
+	, iterateByteString
+
 	-- * DER serialize functions
 	, decodeASN1
 	, decodeASN1s
@@ -26,18 +30,22 @@ module Data.ASN1.DER
 	, encodeASN1s
 	) where
 
-import Data.Maybe (catMaybes)
-
 import Data.ASN1.Raw (ASN1Class(..), ASN1Length(..), ASN1Header(..), ASN1Event(..), ASN1Err(..))
 import qualified Data.ASN1.Raw as Raw
+
 import Data.ASN1.Prim
 import Data.ASN1.Types (ASN1t)
+
 import qualified Data.ASN1.BER as BER
+
 import Data.ByteString (ByteString)
 import qualified Data.ByteString.Lazy as L
-import Control.Monad.Trans (lift)
 
-import Data.Enumerator (Enumeratee, ($$))
+import Control.Monad.Trans (lift)
+import Control.Exception
+
+import Data.Enumerator (Iteratee, Enumeratee, ($$))
+import Data.Enumerator.IO
 import qualified Data.Enumerator as E
 
 {- | Check if the length is the minimum possible and it's not indefinite -}
@@ -86,6 +94,14 @@ enumReadBytes = \f -> E.joinI (Raw.enumReadBytes $$ (BER.enumReadRaw f))
   it transforms chunks of ASN1 objects into chunks of bytestring  -}
 enumWriteBytes :: Monad m => Enumeratee ASN1 ByteString m a
 enumWriteBytes = \f -> E.joinI (enumWriteRaw $$ (Raw.enumWriteBytes f))
+
+{-| iterate over a file using a file enumerator. -}
+iterateFile :: FilePath -> Iteratee ASN1 IO a -> IO (Either SomeException a)
+iterateFile path p = E.run (enumFile path $$ E.joinI $ enumReadBytes $$ p)
+
+{-| iterate over a bytestring using a list enumerator over each chunks -}
+iterateByteString :: Monad m => L.ByteString -> Iteratee ASN1 m a -> m (Either SomeException a)
+iterateByteString bs p = E.run (E.enumList 1 (L.toChunks bs) $$ E.joinI $ enumReadBytes $$ p)
 
 {-# DEPRECATED decodeASN1s "use stream types with decodeASN1Stream" #-}
 decodeASN1s :: L.ByteString -> Either ASN1Err [ASN1t]
