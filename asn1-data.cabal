@@ -32,9 +32,9 @@ Library
                      Data.ASN1.CER
                      Data.ASN1.DER
                      Data.ASN1.Raw
+                     Data.ASN1.Types
   other-modules:     Data.ASN1.Prim
                      Data.ASN1.Stream
-                     Data.ASN1.Types
                      Data.ASN1.Internal
   ghc-options:       -Wall
 
