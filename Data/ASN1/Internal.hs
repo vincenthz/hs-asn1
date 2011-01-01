@@ -1,8 +1,8 @@
-module Data.ASN1.Internal (
-	uintOfBytes,
-	intOfBytes,
-	bytesOfUInt,
-	bytesOfInt
+module Data.ASN1.Internal
+	( uintOfBytes
+	, intOfBytes
+	, bytesOfUInt
+	, bytesOfInt
 	) where
 
 import Data.Word
