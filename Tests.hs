@@ -176,17 +176,21 @@ prop_header_marshalling_id v = (getHeader . putHeader) v == Right v
 
 prop_event_marshalling_id :: ASN1Events -> Bool
 prop_event_marshalling_id (ASN1Events e) =
-	let r = runIdentity $ E.run (E.enumList 1 e $$ E.joinI $ writeBytes $$ E.joinI $ parseBytes $$ E.consume) in
+	let r = runIdentity $ E.run (E.enumList 1 e $$ E.joinI $ enumWriteReadBytes $$ E.consume) in
 	case r of
 		Left _  -> False
 		Right z -> e == z
+	where
+		enumWriteReadBytes = \f -> E.joinI (enumWriteBytes $$ (enumReadBytes f))
 
 prop_asn1_event_marshalling_id :: ASN1 -> Bool
 prop_asn1_event_marshalling_id x =
-	let r = runIdentity $ E.run (E.enumList 1 [x] $$ E.joinI $ BER.writeEvents $$ E.joinI $ BER.parseEvents $$ E.consume) in
+	let r = runIdentity $ E.run (E.enumList 1 [x] $$ E.joinI $ enumWriteReadRaw $$ E.consume) in
 	case r of
 		Left _  -> False
 		Right z -> [x] == z
+	where
+		enumWriteReadRaw = \f -> E.joinI (BER.enumWriteRaw $$ (BER.enumReadRaw f))
 
 prop_asn1_marshalling_id :: T.ASN1t -> Bool
 prop_asn1_marshalling_id v = (DER.decodeASN1 . DER.encodeASN1) v == Right v

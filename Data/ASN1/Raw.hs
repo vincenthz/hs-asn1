@@ -21,8 +21,8 @@ module Data.ASN1.Raw
 	, ASN1Event(..)
 	, iterateFile
 	, iterateByteString
-	, parseBytes
-	, writeBytes
+	, enumReadBytes
+	, enumWriteBytes
 	-- * serialize asn1 headers
 	, getHeader
 	, putHeader
@@ -82,11 +82,11 @@ data ASN1Err =
 
 {-| iterate over a file using a file enumerator. -}
 iterateFile :: FilePath -> Iteratee ASN1Event IO a -> IO (Either SomeException a)
-iterateFile path p = run (enumFile path $$ joinI (parseBytes $$ p))
+iterateFile path p = run (enumFile path $$ joinI (enumReadBytes $$ p))
 
 {-| iterate over a lazy bytestring using a list enumerator over the bytestring chunks. -}
 iterateByteString :: Monad m => L.ByteString -> Iteratee ASN1Event m a -> m (Either SomeException a)
-iterateByteString bs p = run (enumList 1 (L.toChunks bs) $$ joinI (parseBytes $$ p))
+iterateByteString bs p = run (enumList 1 (L.toChunks bs) $$ joinI (enumReadBytes $$ p))
 
 {- parse state machine -}
 data ParseState =
@@ -94,9 +94,9 @@ data ParseState =
 	| PSConstructing Int
 	| PSConstructingEOC
 
-{-| parseBytes parse bytestring and generate asn1event. -}
-parseBytes :: Monad m => Enumeratee ByteString ASN1Event m a
-parseBytes = checkDone $ \k -> k (Chunks []) >>== loop [0] []
+{-| enumReadBytes parse bytestring and generate asn1event. -}
+enumReadBytes :: Monad m => Enumeratee ByteString ASN1Event m a
+enumReadBytes = checkDone $ \k -> k (Chunks []) >>== loop [0] []
 	where
 		loop !cs !ps = checkDone (go cs ps)
 		go (n:[]) [] k = iterDesc >>= eofCheck k
@@ -251,22 +251,22 @@ putLength (LenLong _ i)
 putLength (LenIndefinite) = [0x80]
 
 {-| write Bytes of events enumeratee -}
-writeBytes :: Monad m => Enumeratee ASN1Event ByteString m a
-writeBytes (E.Continue k) = do
+enumWriteBytes :: Monad m => Enumeratee ASN1Event ByteString m a
+enumWriteBytes (E.Continue k) = do
 	x <- E.head
 	case x of
 		Nothing                -> return $ E.Continue k
 		Just (Header hdr)      -> do
 			nstep <- lift $ runIteratee $ k $ E.Chunks [putHeader hdr]
-			writeBytes nstep
+			enumWriteBytes nstep
 		Just (Primitive p)     -> do
 			nstep <- lift $ runIteratee $ k $ E.Chunks [p]
-			writeBytes nstep
+			enumWriteBytes nstep
 		Just ConstructionBegin -> do
 			nstep <- lift $ runIteratee $ k $ E.Chunks []
-			writeBytes nstep
+			enumWriteBytes nstep
 		Just ConstructionEnd   -> do
 			-- FIXME need to push an EOC when doing a indefinite block
 			nstep <- lift $ runIteratee $ k $ E.Chunks []
-			writeBytes nstep
-writeBytes step = return step
+			enumWriteBytes nstep
+enumWriteBytes step = return step

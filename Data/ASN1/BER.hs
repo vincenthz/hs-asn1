@@ -11,8 +11,13 @@ module Data.ASN1.BER
 	( ASN1Class(..)
 	, ASN1(..)
 
-	, parseEvents
-	, writeEvents
+	-- * enumeratee to transform raw
+	, enumReadRaw
+	, enumWriteRaw
+	-- * enumeratee to transform bytes
+	, enumReadBytes
+	, enumWriteBytes
+
 	, iterateFile
 	, iterateByteString
 	-- * BER serial functions
@@ -47,8 +52,8 @@ decodeConstruction (ASN1Header Universal 0x10 _ _) = Sequence
 decodeConstruction (ASN1Header Universal 0x11 _ _) = Set
 decodeConstruction (ASN1Header c t _ _)            = Container c t
 
-parseEvents :: Monad m => Enumeratee Raw.ASN1Event ASN1 m a
-parseEvents = step [] where
+enumReadRaw :: Monad m => Enumeratee Raw.ASN1Event ASN1 m a
+enumReadRaw = step [] where
 	step l (E.Continue k) = do
 		x <- E.head
 		case x of
@@ -79,21 +84,21 @@ parseEvents = step [] where
 				step l newStep
 	step _ x = return x
 
-writeEvents :: Monad m => Enumeratee ASN1 Raw.ASN1Event m a
-writeEvents = \f -> E.joinI (writeASN1Tree $$ (writeTreeEvents f))
+enumWriteRaw :: Monad m => Enumeratee ASN1 Raw.ASN1Event m a
+enumWriteRaw = \f -> E.joinI (enumWriteTree $$ (enumWriteTreeRaw f))
 
-writeASN1Tree :: Monad m => Enumeratee ASN1 (ASN1, [ASN1]) m a
-writeASN1Tree (E.Continue k) = do
+enumWriteTree :: Monad m => Enumeratee ASN1 (ASN1, [ASN1]) m a
+enumWriteTree (E.Continue k) = do
 	x <- E.head
 	case x of
 		Nothing         -> return $ E.Continue k
 		Just n@(Start ty) -> do
 			y <- consumeTillEnd
 			newStep <- lift $ E.runIteratee $ k $ E.Chunks [ (n, y) ]
-			writeASN1Tree newStep
+			enumWriteTree newStep
 		Just p          -> do
 			newStep <- lift $ E.runIteratee $ k $ E.Chunks [ (p, []) ]
-			writeASN1Tree newStep
+			enumWriteTree newStep
 	where
 		consumeTillEnd :: Monad m => Iteratee ASN1 m [ASN1]
 		consumeTillEnd = E.liftI $ step (1 :: Int) id where
@@ -124,10 +129,10 @@ writeASN1Tree (E.Continue k) = do
 			isEnd (End _)     = True
 			isEnd _           = False
 
-writeASN1Tree step = return step
+enumWriteTree step = return step
 
-writeTreeEvents :: Monad m => Enumeratee (ASN1, [ASN1]) Raw.ASN1Event m a
-writeTreeEvents (E.Continue k) = do
+enumWriteTreeRaw :: Monad m => Enumeratee (ASN1, [ASN1]) Raw.ASN1Event m a
+enumWriteTreeRaw (E.Continue k) = do
 	x <- E.head
 	case x of
 		Nothing            -> return $ E.Continue k
@@ -136,17 +141,23 @@ writeTreeEvents (E.Continue k) = do
 				Start _ -> encodeConstructed p children
 				_       -> encodePrimitive p
 			newStep <- lift $ E.runIteratee $ k $ E.Chunks ev
-			writeTreeEvents newStep
+			enumWriteTreeRaw newStep
 
-writeTreeEvents step = return step
+enumWriteTreeRaw step = return step
+
+enumReadBytes :: Monad m => Enumeratee ByteString ASN1 m a
+enumReadBytes = \f -> E.joinI (Raw.enumReadBytes $$ (enumReadRaw f))
+
+enumWriteBytes :: Monad m => Enumeratee ASN1 ByteString m a
+enumWriteBytes = \f -> E.joinI (enumWriteRaw $$ (Raw.enumWriteBytes f))
 
 {-| iterate over a file using a file enumerator. -}
 iterateFile :: FilePath -> Iteratee ASN1 IO a -> IO (Either SomeException a)
-iterateFile path p = E.run (enumFile path $$ E.joinI $ Raw.parseBytes $$ E.joinI $ parseEvents $$ p)
+iterateFile path p = E.run (enumFile path $$ E.joinI $ enumReadBytes $$ p)
 
 {-| iterate over a bytestring using a list enumerator over each chunks -}
 iterateByteString :: Monad m => L.ByteString -> Iteratee ASN1 m a -> m (Either SomeException a)
-iterateByteString bs p = E.run (E.enumList 1 (L.toChunks bs) $$ E.joinI $ Raw.parseBytes $$ E.joinI $ parseEvents $$ p)
+iterateByteString bs p = E.run (E.enumList 1 (L.toChunks bs) $$ E.joinI $ enumReadBytes $$ p)
 
 {-| decode a lazy bytestring as an ASN1 stream -}
 decodeASN1Stream :: L.ByteString -> Either ASN1Err [ASN1]
@@ -157,7 +168,7 @@ decodeASN1Stream l = do
 		Right x -> Right x
 
 encodeASN1Stream :: Monad m => [ASN1] -> Iteratee ByteString m a -> m (Either SomeException a)
-encodeASN1Stream l p = E.run (E.enumList 1 l $$ E.joinI $ writeEvents $$ E.joinI $ Raw.writeBytes $$ p)
+encodeASN1Stream l p = E.run (E.enumList 1 l $$ E.joinI $ enumWriteBytes $$ p)
 
 {-# DEPRECATED decodeASN1s "use stream types with decodeASN1Stream" #-}
 decodeASN1s :: L.ByteString -> Either ASN1Err [ASN1t]
