@@ -23,9 +23,11 @@ module Data.ASN1.BER
 	, iterateFile
 	, iterateByteString
 
-	-- * BER serial functions
+	-- * BER serialize functions
 	, decodeASN1Stream
 	, encodeASN1Stream
+
+	-- * BER serialize functions, deprecated
 	, decodeASN1
 	, decodeASN1s
 	, encodeASN1
