@@ -80,19 +80,65 @@ parseEvents = step [] where
 	step _ x = return x
 
 writeEvents :: Monad m => Enumeratee ASN1 Raw.ASN1Event m a
-writeEvents (E.Continue k) = do
+writeEvents = \f -> E.joinI (writeASN1Tree $$ (writeTreeEvents f))
+
+writeASN1Tree :: Monad m => Enumeratee ASN1 (ASN1, [ASN1]) m a
+writeASN1Tree (E.Continue k) = do
 	x <- E.head
 	case x of
 		Nothing         -> return $ E.Continue k
-		Just (Start ty) -> do
-			newStep <- lift $ E.runIteratee $ k $ E.Chunks []
-			writeEvents newStep
+		Just n@(Start ty) -> do
+			y <- consumeTillEnd
+			newStep <- lift $ E.runIteratee $ k $ E.Chunks [ (n, y) ]
+			writeASN1Tree newStep
 		Just p          -> do
-			let (h, b) = encodePrimitive p
-			newStep <- lift $ E.runIteratee $ k $ E.Chunks [ Raw.Header h, Raw.Primitive b ]
-			writeEvents newStep
+			newStep <- lift $ E.runIteratee $ k $ E.Chunks [ (p, []) ]
+			writeASN1Tree newStep
+	where
+		consumeTillEnd :: Monad m => Iteratee ASN1 m [ASN1]
+		consumeTillEnd = E.liftI $ step (1 :: Int) id where
+			step l acc chunk = case chunk of
+				E.Chunks [] -> E.Continue $ E.returnI . step l acc
+				E.Chunks xs -> do
+					let (ys, zs) = spanEnd l xs
+					let nbend = length $ filter isEnd ys
+					let nbstart = length $ filter isStart ys
+					let nl = l - nbend + nbstart
+					if nl == 0
+						then E.Yield (acc ys) (E.Chunks zs)
+						else E.Continue $ E.returnI . (step nl $ acc . (ys ++))
+				E.EOF       -> E.Yield (acc []) E.EOF
 
-writeEvents step           = return step
+			spanEnd :: Int -> [ASN1] -> ([ASN1], [ASN1])
+			spanEnd _ []               = ([], [])
+			spanEnd 0 (x@(End _):xs)   = ([x], xs)
+			spanEnd 0 (x@(Start _):xs) = let (ys, zs) = spanEnd 1 xs in (x:ys, zs)
+			spanEnd 0 (x:xs)           = let (ys, zs) = spanEnd 0 xs in (x:ys, zs)
+			spanEnd l (x:xs)           = case x of
+				Start _ -> let (ys, zs) = spanEnd (l+1) xs in (x:ys, zs)
+				End _   -> let (ys, zs) = spanEnd (l-1) xs in (x:ys, zs)
+				_       -> let (ys, zs) = spanEnd l xs in (x:ys, zs)
+
+			isStart (Start _) = True
+			isStart _         = False
+			isEnd (End _)     = True
+			isEnd _           = False
+
+writeASN1Tree step = return step
+
+writeTreeEvents :: Monad m => Enumeratee (ASN1, [ASN1]) Raw.ASN1Event m a
+writeTreeEvents (E.Continue k) = do
+	x <- E.head
+	case x of
+		Nothing            -> return $ E.Continue k
+		Just (p,children)       -> do
+			let (_, ev) = case p of
+				Start _ -> encodeConstructed p children
+				_       -> encodePrimitive p
+			newStep <- lift $ E.runIteratee $ k $ E.Chunks ev
+			writeTreeEvents newStep
+
+writeTreeEvents step = return step
 
 {-| iterate over a file using a file enumerator. -}
 iterateFile :: FilePath -> Iteratee ASN1 IO a -> IO (Either SomeException a)
