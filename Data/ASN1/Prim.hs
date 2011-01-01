@@ -18,6 +18,10 @@ module Data.ASN1.Prim
 	, encodePrimitiveHeader
 	, encodePrimitive
 	, decodePrimitive
+	, encodeConstructed
+	, encodeList
+	, encodeOne
+	, mkSmallestLength
 
 	-- * marshall an ASN1 type from a val struct or a bytestring
 	, getBoolean
@@ -136,18 +140,54 @@ encodePrimitiveData (UniversalString b) = putString $ encodeUtf32BE b
 encodePrimitiveData (CharacterString b) = putString b
 encodePrimitiveData (BMPString b)       = putString $ encodeUCS2BE b
 encodePrimitiveData (Other _ _ b)       = b
-encodePrimitiveData _                   = error "not a primitive"
+encodePrimitiveData o                   = error ("not a primitive " ++ show o)
 
-encodePrimitive :: ASN1 -> (ASN1Header, ByteString)
+encodePrimitive :: ASN1 -> (Int, [ASN1Event])
 encodePrimitive a =
 	let b = encodePrimitiveData a in
-	let len = makeLength (B.length b) in
-	(encodePrimitiveHeader len a, b)
+	let blen = B.length b in
+	let len = makeLength blen in
+	let hdr = encodePrimitiveHeader len a in
+	(B.length (putHeader hdr) + blen, [Header hdr, Primitive b])
 	where
 		makeLength len
 			| len < 0x80 = LenShort len
 			| otherwise  = LenLong (nbBytes len) len
 		nbBytes nb = if nb > 255 then 1 + nbBytes (nb `div` 256) else 1
+
+encodeOne :: ASN1 -> (Int, [ASN1Event])
+encodeOne (Start _) = error "encode one cannot do start"
+encodeOne t         = encodePrimitive t
+
+encodeList :: [ASN1] -> (Int, [ASN1Event])
+encodeList []               = (0, [])
+encodeList (End _:xs)       = encodeList xs
+encodeList (t@(Start _):xs) =
+	let (ys, zs)    = getConstructedEnd 0 xs in
+	let (llen, lev) = encodeList zs in
+	let (len, ev)   = encodeConstructed t ys in
+	(llen + len, ev ++ lev)
+
+encodeList (x:xs)           =
+	let (llen, lev) = encodeList xs in
+	let (len, ev)   = encodeOne x in
+	(llen + len, ev ++ lev)
+
+encodeConstructed :: ASN1 -> [ASN1] -> (Int, [ASN1Event])
+encodeConstructed c@(Start _) children =
+	let (clen, events) = encodeList children in
+	let len = mkSmallestLength clen in
+	let h = encodeHeader True len c in
+	let tlen = B.length (putHeader h) + clen in
+	(tlen, Header h : ConstructionBegin : events ++ [ConstructionEnd])
+
+encodeConstructed _ _ = error "not a start node"
+
+mkSmallestLength :: Int -> ASN1Length
+mkSmallestLength i
+	| i < 0x80  = LenShort i
+	| otherwise = LenLong (nbBytes i) i
+		where nbBytes nb = if nb > 255 then 1 + nbBytes (nb `div` 256) else 1
 
 type ASN1Ret = Either ASN1Err ASN1
 
