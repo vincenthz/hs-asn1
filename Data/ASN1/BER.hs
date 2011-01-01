@@ -19,8 +19,10 @@ module Data.ASN1.BER
 	, enumReadBytes
 	, enumWriteBytes
 
+	-- * iterate over common representation to an ASN1 stream
 	, iterateFile
 	, iterateByteString
+
 	-- * BER serial functions
 	, decodeASN1Stream
 	, encodeASN1Stream
@@ -53,6 +55,7 @@ decodeConstruction (ASN1Header Universal 0x10 _ _) = Sequence
 decodeConstruction (ASN1Header Universal 0x11 _ _) = Set
 decodeConstruction (ASN1Header c t _ _)            = Container c t
 
+{- | enumReadRaw is an enumeratee from raw events to asn1 -}
 enumReadRaw :: Monad m => Enumeratee Raw.ASN1Event ASN1 m a
 enumReadRaw = step [] where
 	step l (E.Continue k) = do
@@ -85,6 +88,7 @@ enumReadRaw = step [] where
 				step l newStep
 	step _ x = return x
 
+{- | enumWriteRaw is an enumeratee from asn1 to raw events -}
 enumWriteRaw :: Monad m => Enumeratee ASN1 Raw.ASN1Event m a
 enumWriteRaw = \f -> E.joinI (enumWriteTree $$ (enumWriteTreeRaw f))
 
@@ -146,9 +150,13 @@ enumWriteTreeRaw (E.Continue k) = do
 
 enumWriteTreeRaw step = return step
 
+{-| enumReadBytes is an enumeratee converting from bytestring to ASN1
+  it transforms chunks of bytestring into chunks of ASN1 objects -}
 enumReadBytes :: Monad m => Enumeratee ByteString ASN1 m a
 enumReadBytes = \f -> E.joinI (Raw.enumReadBytes $$ (enumReadRaw f))
 
+{-| enumWriteBytes is an enumeratee converting from ASN1 to bytestring.
+  it transforms chunks of ASN1 objects into chunks of bytestring  -}
 enumWriteBytes :: Monad m => Enumeratee ASN1 ByteString m a
 enumWriteBytes = \f -> E.joinI (enumWriteRaw $$ (Raw.enumWriteBytes f))
 
