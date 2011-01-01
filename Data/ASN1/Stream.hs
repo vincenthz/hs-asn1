@@ -1,6 +1,7 @@
 module Data.ASN1.Stream
 	( ASN1(..)
 	, ConstructionType(..)
+	, getConstructedEnd
 	) where
 
 import Data.ASN1.Raw
@@ -41,3 +42,11 @@ data ASN1 =
 	| Start ConstructionType
 	| End ConstructionType
 	deriving (Show, Eq)
+
+getConstructedEnd :: Int -> [ASN1] -> ([ASN1],[ASN1])
+getConstructedEnd _ xs@[]                = (xs, xs)
+getConstructedEnd i ((x@(Start _)):xs)   = let (yz, zs) = getConstructedEnd (i+1) xs in (x:yz,zs)
+getConstructedEnd i ((x@(End _)):xs)
+	| i == 0                         = ([], xs)
+	| otherwise                      = let (ys, zs) = getConstructedEnd (i-1) xs in (x:ys,zs)
+getConstructedEnd i (x:xs)               = let (ys, zs) = getConstructedEnd i xs in (x:ys,zs)

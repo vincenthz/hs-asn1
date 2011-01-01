@@ -39,20 +39,12 @@ data ASN1t =
 	| Container ASN1Class ASN1Tag [ASN1t]
 	deriving (Show, Eq)
 
-tillEnd :: Int -> [S.ASN1] -> ([S.ASN1],[S.ASN1])
-tillEnd _ xs@[]                = (xs, xs)
-tillEnd i ((x@(S.Start _)):xs) = let (yz, zs) = tillEnd (i+1) xs in (x:yz,zs)
-tillEnd i ((x@(S.End _)):xs)
-	| i == 0               = ([], xs)
-	| otherwise            = let (ys, zs) = tillEnd (i-1) xs in (x:ys,zs)
-tillEnd i (x:xs)               = let (ys, zs) = tillEnd i xs in (x:ys,zs)
-
 ofStream :: [S.ASN1] -> [ASN1t]
 ofStream []                        = []
 ofStream (S.End _ : l)             = ofStream l
 
 ofStream (S.Start ty : l)          =
-	let (c, rest) = tillEnd 0 l in
+	let (c, rest) = S.getConstructedEnd 0 l in
 	(case ty of
 		S.Sequence         -> Sequence (ofStream c)
 		S.Set              -> Set (ofStream c)
