@@ -47,37 +47,37 @@ decodeConstruction (ASN1Header Universal 0x10 _ _) = Sequence
 decodeConstruction (ASN1Header Universal 0x11 _ _) = Set
 decodeConstruction (ASN1Header c t _ _)            = Container c t
 
-parseEvents :: Monad m => [ASN1] -> Enumeratee Raw.ASN1Event ASN1 m a
-parseEvents l (E.Continue k) = do
-	x <- E.head
-	case x of
-		Nothing -> return $ E.Continue k
-		Just Raw.ConstructionEnd -> do
-			newStep <- lift $ E.runIteratee $ k $ E.Chunks [head l]
-			parseEvents (tail l) newStep
-		Just (Raw.Header hdr@(ASN1Header _ _ True _)) -> do
-			z <- E.head
-			let ctype = decodeConstruction hdr
-			newStep <- case z of
-				Nothing                    -> error "partial construction got EOF"
-				Just Raw.ConstructionBegin -> do
-					lift $ runIteratee $ k $ E.Chunks [Start ctype]
-				Just _                     -> error "expecting construction"
-			parseEvents (End ctype : l) newStep
-		Just (Raw.Header hdr@(ASN1Header _ _ False _)) -> do
-			z <- E.head
-			newStep <- case z of
-				Nothing -> error "header without a primitive"
-				Just (Raw.Primitive p) -> do
-					let (Right pr) = decodePrimitive hdr p
-					lift $ runIteratee $ k $ E.Chunks [pr]
-				Just _ -> error "expecting primitive"
-			parseEvents l newStep
-		Just _ -> do
-			newStep <- lift $ runIteratee $ k $ E.Chunks []
-			parseEvents l newStep
-
-parseEvents _ step = return step
+parseEvents :: Monad m => Enumeratee Raw.ASN1Event ASN1 m a
+parseEvents = step [] where
+	step l (E.Continue k) = do
+		x <- E.head
+		case x of
+			Nothing -> return $ E.Continue k
+			Just Raw.ConstructionEnd -> do
+				newStep <- lift $ E.runIteratee $ k $ E.Chunks [head l]
+				step (tail l) newStep
+			Just (Raw.Header hdr@(ASN1Header _ _ True _)) -> do
+				z <- E.head
+				let ctype = decodeConstruction hdr
+				newStep <- case z of
+					Nothing                    -> error "partial construction got EOF"
+					Just Raw.ConstructionBegin -> do
+						lift $ runIteratee $ k $ E.Chunks [Start ctype]
+					Just _                     -> error "expecting construction"
+				step (End ctype : l) newStep
+			Just (Raw.Header hdr@(ASN1Header _ _ False _)) -> do
+				z <- E.head
+				newStep <- case z of
+					Nothing -> error "header without a primitive"
+					Just (Raw.Primitive p) -> do
+						let (Right pr) = decodePrimitive hdr p
+						lift $ runIteratee $ k $ E.Chunks [pr]
+					Just _ -> error "expecting primitive"
+				step l newStep
+			Just _ -> do
+				newStep <- lift $ runIteratee $ k $ E.Chunks []
+				step l newStep
+	step _ x = return x
 
 writeEvents :: Monad m => Enumeratee ASN1 Raw.ASN1Event m a
 writeEvents (E.Continue k) = do
@@ -96,11 +96,11 @@ writeEvents step           = return step
 
 {-| iterate over a file using a file enumerator. -}
 iterateFile :: FilePath -> Iteratee ASN1 IO a -> IO (Either SomeException a)
-iterateFile path p = E.run (enumFile path $$ E.joinI $ Raw.parseBytes $$ E.joinI $ parseEvents [] $$ p)
+iterateFile path p = E.run (enumFile path $$ E.joinI $ Raw.parseBytes $$ E.joinI $ parseEvents $$ p)
 
 {-| iterate over a bytestring using a list enumerator over each chunks -}
 iterateByteString :: Monad m => L.ByteString -> Iteratee ASN1 m a -> m (Either SomeException a)
-iterateByteString bs p = E.run (E.enumList 1 (L.toChunks bs) $$ E.joinI $ Raw.parseBytes $$ E.joinI $ parseEvents [] $$ p) 
+iterateByteString bs p = E.run (E.enumList 1 (L.toChunks bs) $$ E.joinI $ Raw.parseBytes $$ E.joinI $ parseEvents $$ p)
 
 {-| decode a lazy bytestring as an ASN1 stream -}
 decodeASN1Stream :: L.ByteString -> Either ASN1Err [ASN1]
