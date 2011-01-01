@@ -4,7 +4,8 @@ import Test.QuickCheck
 import Text.Printf
 
 import Data.ASN1.Raw
-import Data.ASN1.Types (ASN1t(..))
+import Data.ASN1.Stream (ASN1(..), ConstructionType(..))
+import qualified Data.ASN1.Types as T (ASN1t(..))
 import qualified Data.ASN1.DER as DER
 import qualified Data.ASN1.BER as BER
 
@@ -106,9 +107,9 @@ arbitraryTime = do
 
 arbitraryListASN1 = choose (0, 20) >>= \len -> replicateM len (suchThat arbitrary (not . aList))
 	where
-		aList (Set _)      = True
-		aList (Sequence _) = True
-		aList _            = False
+		aList (T.Set _)      = True
+		aList (T.Sequence _) = True
+		aList _              = False
 
 arbitraryPrintString = do
 	let printableString = (['a'..'z'] ++ ['A'..'Z'] ++ ['0'..'9'] ++ " ()+,-./:=?")
@@ -119,30 +120,30 @@ arbitraryIA5String = do
 	x <- replicateM 21 (elements $ map toEnum [0..127])
 	return $ T.pack x
 
-instance Arbitrary ASN1t where
+instance Arbitrary T.ASN1t where
 	arbitrary = oneof
-		[ liftM Boolean arbitrary
-		, liftM IntVal arbitrary
-		, liftM2 BitString (choose (0,7)) arbitrary
-		, liftM OctetString arbitrary
-		, return Null
-		, liftM OID arbitraryOID
+		[ liftM T.Boolean arbitrary
+		, liftM T.IntVal arbitrary
+		, liftM2 T.BitString (choose (0,7)) arbitrary
+		, liftM T.OctetString arbitrary
+		, return T.Null
+		, liftM T.OID arbitraryOID
 		--, Real Double
 		-- , return Enumerated
-		, liftM UTF8String arbitrary
-		, liftM Sequence arbitraryListASN1
-		, liftM Set arbitraryListASN1
-		, liftM NumericString arbitrary
-		, liftM PrintableString arbitraryPrintString
-		, liftM T61String arbitrary
-		, liftM VideoTexString arbitrary
-		, liftM IA5String arbitraryIA5String
-		, liftM UTCTime arbitraryTime
-		, liftM GeneralizedTime arbitraryTime
-		, liftM GraphicString arbitrary
-		, liftM VisibleString arbitrary
-		, liftM GeneralString arbitrary
-		, liftM UniversalString arbitrary
+		, liftM T.UTF8String arbitrary
+		, liftM T.Sequence arbitraryListASN1
+		, liftM T.Set arbitraryListASN1
+		, liftM T.NumericString arbitrary
+		, liftM T.PrintableString arbitraryPrintString
+		, liftM T.T61String arbitrary
+		, liftM T.VideoTexString arbitrary
+		, liftM T.IA5String arbitraryIA5String
+		, liftM T.UTCTime arbitraryTime
+		, liftM T.GeneralizedTime arbitraryTime
+		, liftM T.GraphicString arbitrary
+		, liftM T.VisibleString arbitrary
+		, liftM T.GeneralString arbitrary
+		, liftM T.UniversalString arbitrary
 		]
 
 prop_header_marshalling_id :: ASN1Header -> Bool
@@ -155,7 +156,7 @@ prop_event_marshalling_id (ASN1Events e) =
 		Left _  -> False
 		Right z -> e == z
 
-prop_asn1_marshalling_id :: ASN1t -> Bool
+prop_asn1_marshalling_id :: T.ASN1t -> Bool
 prop_asn1_marshalling_id v = (DER.decodeASN1 . DER.encodeASN1) v == Right v
 
 args = stdArgs
