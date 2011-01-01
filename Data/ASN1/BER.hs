@@ -11,10 +11,11 @@ module Data.ASN1.BER
 	( ASN1Class(..)
 	, ASN1(..)
 
-	-- * enumeratee to transform raw
+	-- * enumeratee to transform between ASN1 and raw
 	, enumReadRaw
 	, enumWriteRaw
-	-- * enumeratee to transform bytes
+
+	-- * enumeratee to transform between ASN1 and bytes
 	, enumReadBytes
 	, enumWriteBytes
 
