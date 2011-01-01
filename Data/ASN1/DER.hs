@@ -11,24 +11,34 @@ module Data.ASN1.DER
 	( ASN1Class(..)
 	, ASN1(..)
 
+	-- * enumeratee to transform between ASN1 and raw
+	, enumReadRaw
+	, enumWriteRaw
+
+	-- * enumeratee to transform between ASN1 and bytes
+	, enumReadBytes
+	, enumWriteBytes
+
 	-- * DER serialize functions
-	{-
-	, decodeASN1Get
-	, decodeASN1State
-	-}
 	, decodeASN1
 	, decodeASN1s
 	, encodeASN1
 	, encodeASN1s
 	) where
 
-import Data.ASN1.Raw
+import Data.Maybe (catMaybes)
+
+import Data.ASN1.Raw (ASN1Class(..), ASN1Length(..), ASN1Header(..), ASN1Event(..), ASN1Err(..))
+import qualified Data.ASN1.Raw as Raw
 import Data.ASN1.Prim
 import Data.ASN1.Types (ASN1t)
 import qualified Data.ASN1.BER as BER
+import Data.ByteString (ByteString)
 import qualified Data.ByteString.Lazy as L
+import Control.Monad.Trans (lift)
 
-{-
+import Data.Enumerator (Enumeratee, ($$))
+import qualified Data.Enumerator as E
 
 {- | Check if the length is the minimum possible and it's not indefinite -}
 checkLength :: ASN1Length -> Maybe ASN1Err
@@ -37,41 +47,45 @@ checkLength (LenShort _)  = Nothing
 checkLength (LenLong n i)
 	| n == 1 && i < 0x80  = Just $ ASN1PolicyFailed "DER" "long length should be a short length"
 	| n == 1 && i >= 0x80 = Nothing
-	| otherwise           = if i >= 2^((n-1)*8) && i < 2^(n*8) then Nothing else Just $ ASN1PolicyFailed "DER" "long length is not shortest"
+	| otherwise           = if i >= 2^((n-1)*8) && i < 2^(n*8)
+		then Nothing
+		else Just $ ASN1PolicyFailed "DER" "long length is not shortest"
 
-{- | check if the value type is correct -}
-checkType :: ASN1Class -> ASN1Tag -> Maybe ASN1Err
-checkType _ _ = Nothing
+checkRawDER :: Monad m => Enumeratee Raw.ASN1Event Raw.ASN1Event m a
+checkRawDER (E.Continue k) = do
+	x <- E.head
+	case x of
+		Nothing -> return $ E.Continue k
+		Just l  ->
+			let err = tyCheck l in
+			if err == Nothing
+				then do
+					newStep <- lift $ E.runIteratee $ k $ E.Chunks [l]
+					checkRawDER newStep
+				else error "DER policy failed"
+	where
+		tyCheck (Header (ASN1Header _ _ _ len)) = checkLength len
+		tyCheck _                               = Nothing
 
-{- | check if the value is bounded by DER policies -}
-check :: (ASN1Class, Bool, ASN1Tag) -> ASN1Length -> Maybe ASN1Err
-check (tc,_,tn) vallen = checkLength vallen `mplus` checkType tc tn
+checkRawDER step = return step
 
-{- | ofRaw same as BER.ofRAW but check some additional DER constraint. -}
-ofRaw :: Value -> Either ASN1Err ASN1
-ofRaw (Value Universal 0x1 (Primitive b)) = getBoolean True b
-ofRaw v                                   = BER.ofRaw v
+{- | enumReadRaw is an enumeratee from raw events to asn1 -}
+enumReadRaw :: Monad m => Enumeratee Raw.ASN1Event ASN1 m a
+enumReadRaw = \f -> E.joinI (checkRawDER $$ BER.enumReadRaw f)
 
-{- | toRaw create a DER encoded value ready -}
-toRaw :: ASN1 -> Value
-toRaw = BER.toRaw
+{- | enumWriteRaw is an enumeratee from asn1 to raw events -}
+enumWriteRaw :: Monad m => Enumeratee ASN1 Raw.ASN1Event m a
+enumWriteRaw = BER.enumWriteRaw
 
-decodeASN1Get :: Get (Either ASN1Err ASN1)
-decodeASN1Get = runGetErrInGet (getValueCheck check) >>= return . either Left ofRaw
+{-| enumReadBytes is an enumeratee converting from bytestring to ASN1
+  it transforms chunks of bytestring into chunks of ASN1 objects -}
+enumReadBytes :: Monad m => Enumeratee ByteString ASN1 m a
+enumReadBytes = \f -> E.joinI (Raw.enumReadBytes $$ (BER.enumReadRaw f))
 
-decodeASN1State :: L.ByteString -> Either ASN1Err (ASN1, L.ByteString, Int64)
-decodeASN1State b =
-	runGetErrState (getValueCheck check >>= either throwError return . BER.ofRaw) b 0
-
-decodeASN1 :: L.ByteString -> Either ASN1Err ASN1
-decodeASN1 b = either Left BER.ofRaw $ runGetErr (getValueCheck check) b
-
-decodeASN1s :: L.ByteString -> Either ASN1Err [ASN1]
-decodeASN1s = loop where
-	loop z = case decodeASN1State z of
-		Left err -> throwError err
-		Right (v, rest, _) -> if L.length rest > 0 then liftM (v :) (loop rest) else return [v]
--}
+{-| enumWriteBytes is an enumeratee converting from ASN1 to bytestring.
+  it transforms chunks of ASN1 objects into chunks of bytestring  -}
+enumWriteBytes :: Monad m => Enumeratee ASN1 ByteString m a
+enumWriteBytes = \f -> E.joinI (enumWriteRaw $$ (Raw.enumWriteBytes f))
 
 {-# DEPRECATED decodeASN1s "use stream types with decodeASN1Stream" #-}
 decodeASN1s :: L.ByteString -> Either ASN1Err [ASN1t]
