@@ -41,7 +41,6 @@ import Data.ASN1.Stream
 import Data.ASN1.Types (ofStream, toStream, ASN1t)
 import Data.ASN1.Prim
 
-import Control.Monad.Error
 import Control.Monad.Identity
 import Control.Exception
 
@@ -173,10 +172,9 @@ iterateByteString bs p = E.run (E.enumList 1 (L.toChunks bs) $$ E.joinI $ enumRe
 {-| decode a lazy bytestring as an ASN1 stream -}
 decodeASN1Stream :: L.ByteString -> Either ASN1Err [ASN1]
 decodeASN1Stream l = do
-	r <- iterateByteString l E.consume
-	case r of
-		Left _  -> Left ASN1ParsingFail
-		Right x -> Right x
+	case runIdentity (iterateByteString l E.consume) of
+		Left err -> Left (maybe (ASN1ParsingFail "unknown") id $ fromException err)
+		Right x  -> Right x
 
 encodeASN1Stream :: Monad m => [ASN1] -> Iteratee ByteString m a -> m (Either SomeException a)
 encodeASN1Stream l p = E.run (E.enumList 1 l $$ E.joinI $ enumWriteBytes $$ p)
