@@ -43,7 +43,6 @@ import Data.Typeable
 import Data.Word
 import Data.Bits
 import Control.Monad
-import Control.Monad.Trans (lift)
 import Control.Applicative ((<|>), (<$>))
 
 data ASN1Class =
