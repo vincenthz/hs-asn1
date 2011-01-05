@@ -85,18 +85,15 @@ enumWriteRaw :: Monad m => Enumeratee ASN1 Raw.ASN1Event m a
 enumWriteRaw = \f -> E.joinI (enumWriteTree $$ (enumWriteTreeRaw f))
 
 enumWriteTree :: Monad m => Enumeratee ASN1 (ASN1, [ASN1]) m a
-enumWriteTree (E.Continue k) = do
-	x <- E.head
-	case x of
-		Nothing         -> return $ E.Continue k
-		Just n@(Start ty) -> do
-			y <- consumeTillEnd
-			newStep <- lift $ E.runIteratee $ k $ E.Chunks [ (n, y) ]
-			enumWriteTree newStep
-		Just p          -> do
-			newStep <- lift $ E.runIteratee $ k $ E.Chunks [ (p, []) ]
-			enumWriteTree newStep
+enumWriteTree = do
+	E.checkDone $ \k -> k (E.Chunks []) >>== loop
 	where
+		loop = E.checkDone $ go
+		go k = E.head >>= \x -> case x of
+			Nothing          -> k (E.Chunks []) >>== return
+			Just n@(Start _) -> consumeTillEnd >>= \y -> k (E.Chunks [(n, y)] ) >>== loop
+			Just p           -> k (E.Chunks [(p, [])] ) >>== loop
+
 		consumeTillEnd :: Monad m => Iteratee ASN1 m [ASN1]
 		consumeTillEnd = E.liftI $ step (1 :: Int) id where
 			step l acc chunk = case chunk of
@@ -126,7 +123,6 @@ enumWriteTree (E.Continue k) = do
 			isEnd (End _)     = True
 			isEnd _           = False
 
-enumWriteTree step = return step
 
 enumWriteTreeRaw :: Monad m => Enumeratee (ASN1, [ASN1]) Raw.ASN1Event m a
 enumWriteTreeRaw = E.concatMap writeTree
