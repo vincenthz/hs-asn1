@@ -1,7 +1,9 @@
 Name:                asn1-data
 Version:             0.4.0
 Description:
-    ASN1 data reader and writer in raw form with supports for high level forms of ASN1 (BER, CER and DER)
+    ASN1 data reader and writer in raw form with supports for high level forms of ASN1 (BER, CER and DER).
+    .
+    All interfaces use the enumerator interface.
 License:             BSD3
 License-file:        LICENSE
 Copyright:           Vincent Hanquez <vincent@snarc.org>
