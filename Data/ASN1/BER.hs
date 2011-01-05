@@ -48,7 +48,7 @@ import qualified Data.ByteString.Lazy as L
 import Data.ByteString (ByteString)
 
 import Data.Enumerator.IO
-import Data.Enumerator (Iteratee(..), Enumeratee, ($$))
+import Data.Enumerator (Iteratee(..), Enumeratee, ($$), (>>==))
 import qualified Data.Enumerator as E
 
 decodeConstruction :: ASN1Header -> ConstructionType
@@ -58,36 +58,27 @@ decodeConstruction (ASN1Header c t _ _)            = Container c t
 
 {- | enumReadRaw is an enumeratee from raw events to asn1 -}
 enumReadRaw :: Monad m => Enumeratee Raw.ASN1Event ASN1 m a
-enumReadRaw = step [] where
-	step l (E.Continue k) = do
-		x <- E.head
-		case x of
-			Nothing -> return $ E.Continue k
-			Just Raw.ConstructionEnd -> do
-				newStep <- lift $ E.runIteratee $ k $ E.Chunks [head l]
-				step (tail l) newStep
-			Just (Raw.Header hdr@(ASN1Header _ _ True _)) -> do
-				z <- E.head
-				let ctype = decodeConstruction hdr
-				newStep <- case z of
-					Nothing                    -> error "partial construction got EOF"
-					Just Raw.ConstructionBegin -> do
-						lift $ runIteratee $ k $ E.Chunks [Start ctype]
-					Just _                     -> error "expecting construction"
-				step (End ctype : l) newStep
-			Just (Raw.Header hdr@(ASN1Header _ _ False _)) -> do
-				z <- E.head
-				newStep <- case z of
-					Nothing -> error "header without a primitive"
-					Just (Raw.Primitive p) -> do
-						let (Right pr) = decodePrimitive hdr p
-						lift $ runIteratee $ k $ E.Chunks [pr]
-					Just _ -> error "expecting primitive"
-				step l newStep
-			Just _ -> do
-				newStep <- lift $ runIteratee $ k $ E.Chunks []
-				step l newStep
-	step _ x = return x
+enumReadRaw = E.checkDone $ \k -> k (E.Chunks []) >>== loop []
+	where
+		loop l = E.checkDone $ go l
+		go l k = E.head >>= \x -> case x of
+			Nothing                  ->
+				if l == [] then  k (E.Chunks []) >>== return else E.throwError (Raw.ASN1ParsingPartial)
+			Just Raw.ConstructionEnd ->
+				k (E.Chunks [head l]) >>== loop (tail l)
+			Just (Raw.Header hdr@(ASN1Header _ _ True _)) -> E.head >>= \z -> case z of
+				Nothing                    -> E.throwError (Raw.ASN1ParsingFail "expecting construction, got EOF")
+				Just Raw.ConstructionBegin ->
+					let ctype = decodeConstruction hdr in
+					k (E.Chunks [Start ctype]) >>== loop (End ctype : l)
+				Just _                     -> E.throwError (Raw.ASN1ParsingFail "expecting construction")
+			Just (Raw.Header hdr@(ASN1Header _ _ False _)) -> E.head >>= \z -> case z of
+				Nothing -> E.throwError (Raw.ASN1ParsingFail "expecting primitive, got EOF")
+				Just (Raw.Primitive p) ->
+					let (Right pr) = decodePrimitive hdr p in
+					k (E.Chunks [pr]) >>== loop l
+				Just _  -> E.throwError (Raw.ASN1ParsingFail "expecting primitive")
+			Just _ -> E.throwError (Raw.ASN1ParsingFail "boundary not a header")
 
 {- | enumWriteRaw is an enumeratee from asn1 to raw events -}
 enumWriteRaw :: Monad m => Enumeratee ASN1 Raw.ASN1Event m a
