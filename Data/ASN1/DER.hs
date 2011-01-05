@@ -24,6 +24,10 @@ module Data.ASN1.DER
 	, iterateByteString
 
 	-- * DER serialize functions
+	, decodeASN1Stream
+	, encodeASN1Stream
+
+	-- * DER serialize functions, deprecated
 	, decodeASN1
 	, decodeASN1s
 	, encodeASN1
@@ -34,13 +38,14 @@ import Data.ASN1.Raw (ASN1Class(..), ASN1Length(..), ASN1Header(..), ASN1Event(.
 import qualified Data.ASN1.Raw as Raw
 
 import Data.ASN1.Prim
-import Data.ASN1.Types (ASN1t)
+import Data.ASN1.Types (ofStream, toStream, ASN1t)
 
 import qualified Data.ASN1.BER as BER
 
 import Data.ByteString (ByteString)
 import qualified Data.ByteString.Lazy as L
 
+import Control.Monad.Identity
 import Control.Exception
 
 import Data.Enumerator (Iteratee, Enumeratee, ($$), (>>==))
@@ -96,18 +101,30 @@ iterateFile path p = E.run (enumFile path $$ E.joinI $ enumReadBytes $$ p)
 iterateByteString :: Monad m => L.ByteString -> Iteratee ASN1 m a -> m (Either SomeException a)
 iterateByteString bs p = E.run (E.enumList 1 (L.toChunks bs) $$ E.joinI $ enumReadBytes $$ p)
 
+{-| decode a lazy bytestring as an ASN1 stream -}
+decodeASN1Stream :: L.ByteString -> Either ASN1Err [ASN1]
+decodeASN1Stream l = do
+	case runIdentity (iterateByteString l E.consume) of
+		Left err -> Left (maybe (ASN1ParsingFail "unknown") id $ fromException err)
+		Right x  -> Right x
+
+encodeASN1Stream :: Monad m => [ASN1] -> Iteratee ByteString m a -> m (Either SomeException a)
+encodeASN1Stream l p = E.run (E.enumList 1 l $$ E.joinI $ enumWriteBytes $$ p)
+
 {-# DEPRECATED decodeASN1s "use stream types with decodeASN1Stream" #-}
 decodeASN1s :: L.ByteString -> Either ASN1Err [ASN1t]
-decodeASN1s = BER.decodeASN1s
+decodeASN1s l = either (Left) (Right . ofStream) $ decodeASN1Stream l
 
 {-# DEPRECATED decodeASN1 "use stream types with decodeASN1Stream" #-}
 decodeASN1 :: L.ByteString -> Either ASN1Err ASN1t
-decodeASN1 = BER.decodeASN1
+decodeASN1 = either (Left) (Right . head) . decodeASN1s
 
 {-# DEPRECATED encodeASN1s "use stream types with encodeASN1Stream" #-}
 encodeASN1s :: [ASN1t] -> L.ByteString
-encodeASN1s = BER.encodeASN1s
+encodeASN1s l = case runIdentity (encodeASN1Stream (toStream l) E.consume) of
+	Left _  -> error "encoding failed"
+	Right x -> L.fromChunks x
 
 {-# DEPRECATED encodeASN1 "use stream types with encodeASN1Stream" #-}
 encodeASN1 :: ASN1t -> L.ByteString
-encodeASN1 = BER.encodeASN1
+encodeASN1 = encodeASN1s . (:[])
