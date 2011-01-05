@@ -1,1 +1,4 @@
-remove FIXMEs
+- remove FIXMEs
+- repair CER
+- remove deprecated interface and deprecated asn1t types.
+- improve testing
