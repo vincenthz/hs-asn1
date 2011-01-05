@@ -41,10 +41,9 @@ import qualified Data.ASN1.BER as BER
 import Data.ByteString (ByteString)
 import qualified Data.ByteString.Lazy as L
 
-import Control.Monad.Trans (lift)
 import Control.Exception
 
-import Data.Enumerator (Iteratee, Enumeratee, ($$))
+import Data.Enumerator (Iteratee, Enumeratee, ($$), (>>==))
 import Data.Enumerator.IO
 import qualified Data.Enumerator as E
 
@@ -60,22 +59,16 @@ checkLength (LenLong n i)
 		else Just $ ASN1PolicyFailed "DER" "long length is not shortest"
 
 checkRawDER :: Monad m => Enumeratee Raw.ASN1Event Raw.ASN1Event m a
-checkRawDER (E.Continue k) = do
-	x <- E.head
-	case x of
-		Nothing -> return $ E.Continue k
-		Just l  ->
-			let err = tyCheck l in
-			if err == Nothing
-				then do
-					newStep <- lift $ E.runIteratee $ k $ E.Chunks [l]
-					checkRawDER newStep
-				else error "DER policy failed"
+checkRawDER = E.checkDone $ \k -> k (E.Chunks []) >>== loop
 	where
+		loop = E.checkDone go
+		go k = E.head >>= \x -> case x of
+			Nothing -> k (E.Chunks []) >>== return
+			Just l  -> case tyCheck l of
+				Nothing  -> k (E.Chunks [l]) >>== loop
+				Just err -> E.throwError err
 		tyCheck (Header (ASN1Header _ _ _ len)) = checkLength len
 		tyCheck _                               = Nothing
-
-checkRawDER step = return step
 
 {- | enumReadRaw is an enumeratee from raw events to asn1 -}
 enumReadRaw :: Monad m => Enumeratee Raw.ASN1Event ASN1 m a
