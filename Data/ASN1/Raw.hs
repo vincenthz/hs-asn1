@@ -1,4 +1,4 @@
-{-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE BangPatterns, DeriveDataTypeable #-}
 -- |
 -- Module      : Data.ASN1.Raw
 -- License     : BSD-style
@@ -39,6 +39,7 @@ import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as L
 import Data.ASN1.Internal
 import Control.Exception
+import Data.Typeable
 import Data.Word
 import Data.Bits
 import Control.Monad
@@ -72,13 +73,17 @@ data ASN1Event =
 
 data ASN1Err =
 	  ASN1LengthDecodingLongContainsZero
+	| ASN1WritingUnexpectedConstructionEnd
+	| ASN1WritingUnexpectedInputEOF
 	| ASN1PolicyFailed String String
 	| ASN1NotImplemented String
 	| ASN1Multiple [ASN1Err]
 	| ASN1Misc String
 	| ASN1ParsingPartial
-	| ASN1ParsingFail
-	deriving (Show, Eq)
+	| ASN1ParsingFail String
+	deriving (Typeable, Show, Eq)
+
+instance Exception ASN1Err
 
 {-| iterate over a file using a file enumerator. -}
 iterateFile :: FilePath -> Iteratee ASN1Event IO a -> IO (Either SomeException a)
@@ -162,8 +167,8 @@ parseHeader = do
 {- parse an header from a single bytestring. -}
 getHeader :: ByteString -> Either ASN1Err ASN1Header
 getHeader l = case parse parseHeader l of
-	(Fail _ _ _) -> Left ASN1ParsingFail
-	(Partial _)  -> Left ASN1ParsingPartial
+	(Fail _ _ _) -> Left (ASN1ParsingFail "header")
+	(Partial _)  -> Left (ASN1ParsingPartial)
 	Done b r     -> if B.null b then Right (snd r) else Left ASN1ParsingPartial
 
 {- parse the first word of an header -}
