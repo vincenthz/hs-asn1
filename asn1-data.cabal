@@ -26,7 +26,7 @@ Library
                      text >= 0.11,
                      enumerator >= 0.4 && < 0.5,
                      attoparsec >= 0.8 && < 0.9,
-                     attoparsec-enumerator,
+                     attoparsec-enumerator >= 0.2 && < 0.3,
                      mtl
   Exposed-modules:   Data.ASN1.BER
                      Data.ASN1.CER
