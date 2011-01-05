@@ -10,6 +10,7 @@
 module Data.ASN1.DER
 	( ASN1Class(..)
 	, ASN1(..)
+	, ASN1ConstructionType(..)
 
 	-- * enumeratee to transform between ASN1 and raw
 	, enumReadRaw

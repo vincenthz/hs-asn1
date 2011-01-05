@@ -10,6 +10,7 @@
 module Data.ASN1.BER
 	( ASN1Class(..)
 	, ASN1(..)
+	, ASN1ConstructionType(..)
 
 	-- * enumeratee to transform between ASN1 and raw
 	, enumReadRaw
@@ -51,7 +52,7 @@ import Data.Enumerator.IO
 import Data.Enumerator (Iteratee(..), Enumeratee, ($$), (>>==))
 import qualified Data.Enumerator as E
 
-decodeConstruction :: ASN1Header -> ConstructionType
+decodeConstruction :: ASN1Header -> ASN1ConstructionType
 decodeConstruction (ASN1Header Universal 0x10 _ _) = Sequence
 decodeConstruction (ASN1Header Universal 0x11 _ _) = Set
 decodeConstruction (ASN1Header c t _ _)            = Container c t

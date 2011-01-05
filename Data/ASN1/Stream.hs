@@ -1,6 +1,6 @@
 module Data.ASN1.Stream
 	( ASN1(..)
-	, ConstructionType(..)
+	, ASN1ConstructionType(..)
 	, getConstructedEnd
 	) where
 
@@ -9,7 +9,7 @@ import Data.Text.Lazy (Text)
 import Data.ByteString (ByteString)
 import qualified Data.ByteString.Lazy as L
 
-data ConstructionType =
+data ASN1ConstructionType =
 	  Sequence
 	| Set
 	| Container ASN1Class ASN1Tag
@@ -39,8 +39,8 @@ data ASN1 =
 	| CharacterString L.ByteString
 	| BMPString Text
 	| Other ASN1Class ASN1Tag ByteString
-	| Start ConstructionType
-	| End ConstructionType
+	| Start ASN1ConstructionType
+	| End ASN1ConstructionType
 	deriving (Show, Eq)
 
 getConstructedEnd :: Int -> [ASN1] -> ([ASN1],[ASN1])

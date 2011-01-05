@@ -12,7 +12,7 @@ module Data.ASN1.Prim
 	(
 	-- * ASN1 high level algebraic type
 	  ASN1(..)
-	, ConstructionType(..)
+	, ASN1ConstructionType(..)
 
 	, encodeHeader
 	, encodePrimitiveHeader
