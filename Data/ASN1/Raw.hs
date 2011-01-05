@@ -257,21 +257,19 @@ putLength (LenIndefinite) = [0x80]
 
 {-| write Bytes of events enumeratee -}
 enumWriteBytes :: Monad m => Enumeratee ASN1Event ByteString m a
-enumWriteBytes (E.Continue k) = do
-	x <- E.head
-	case x of
-		Nothing                -> return $ E.Continue k
-		Just (Header hdr)      -> do
-			nstep <- lift $ runIteratee $ k $ E.Chunks [putHeader hdr]
-			enumWriteBytes nstep
-		Just (Primitive p)     -> do
-			nstep <- lift $ runIteratee $ k $ E.Chunks [p]
-			enumWriteBytes nstep
-		Just ConstructionBegin -> do
-			nstep <- lift $ runIteratee $ k $ E.Chunks []
-			enumWriteBytes nstep
-		Just ConstructionEnd   -> do
-			-- FIXME need to push an EOC when doing a indefinite block
-			nstep <- lift $ runIteratee $ k $ E.Chunks []
-			enumWriteBytes nstep
-enumWriteBytes step = return step
+enumWriteBytes = checkDone $ \k -> k (Chunks []) >>== loop []
+	where
+		putEoc    = putHeader $ ASN1Header Universal 0 False (LenShort 0)
+		loop eocs = checkDone $ go eocs
+		go eocs k = E.head >>= \x -> case x of
+			Nothing                ->
+				if eocs == [] then k (Chunks []) >>== return else E.throwError ASN1WritingUnexpectedInputEOF
+			Just (Header hdr@(ASN1Header _ _ True len)) ->
+				k (Chunks [putHeader hdr]) >>== loop ((len == LenIndefinite) : eocs)
+			Just (Header hdr)      -> k (Chunks [putHeader hdr]) >>== loop eocs
+			Just (Primitive p)     -> k (Chunks [p]) >>== loop eocs
+			Just ConstructionBegin -> k (Chunks []) >>== loop eocs
+			Just ConstructionEnd   -> case eocs of
+				[]         -> E.throwError ASN1WritingUnexpectedConstructionEnd
+				True : tl  -> k (Chunks [putEoc]) >>== loop tl
+				False : tl -> k (Chunks []) >>== loop tl
