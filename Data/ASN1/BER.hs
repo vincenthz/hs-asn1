@@ -138,18 +138,10 @@ enumWriteTree (E.Continue k) = do
 enumWriteTree step = return step
 
 enumWriteTreeRaw :: Monad m => Enumeratee (ASN1, [ASN1]) Raw.ASN1Event m a
-enumWriteTreeRaw (E.Continue k) = do
-	x <- E.head
-	case x of
-		Nothing            -> return $ E.Continue k
-		Just (p,children)       -> do
-			let (_, ev) = case p of
-				Start _ -> encodeConstructed p children
-				_       -> encodePrimitive p
-			newStep <- lift $ E.runIteratee $ k $ E.Chunks ev
-			enumWriteTreeRaw newStep
-
-enumWriteTreeRaw step = return step
+enumWriteTreeRaw = E.concatMap writeTree
+	where writeTree (p,children) = snd $ case p of
+		Start _ -> encodeConstructed p children
+		_       -> encodePrimitive p
 
 {-| enumReadBytes is an enumeratee converting from bytestring to ASN1
   it transforms chunks of bytestring into chunks of ASN1 objects -}
