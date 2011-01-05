@@ -192,8 +192,8 @@ decodeASN1 = either (Left) (Right . head) . decodeASN1s
 {-# DEPRECATED encodeASN1s "use stream types with encodeASN1Stream" #-}
 encodeASN1s :: [ASN1t] -> L.ByteString
 encodeASN1s l = case runIdentity (encodeASN1Stream (toStream l) E.consume) of
-	Left err -> error "encoding failed"
-	Right x  -> L.fromChunks x
+	Left _  -> error "encoding failed"
+	Right x -> L.fromChunks x
 
 {-# DEPRECATED encodeASN1 "use stream types with encodeASN1Stream" #-}
 encodeASN1 :: ASN1t -> L.ByteString
