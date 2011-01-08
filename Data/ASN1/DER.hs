@@ -104,7 +104,7 @@ iterateByteString bs p = E.run (E.enumList 1 (L.toChunks bs) $$ E.joinI $ enumRe
 
 {-| decode a lazy bytestring as an ASN1 stream -}
 decodeASN1Stream :: L.ByteString -> Either ASN1Err [ASN1]
-decodeASN1Stream l = do
+decodeASN1Stream l =
 	case runIdentity (iterateByteString l E.consume) of
 		Left err -> Left (maybe (ASN1ParsingFail "unknown") id $ fromException err)
 		Right x  -> Right x
