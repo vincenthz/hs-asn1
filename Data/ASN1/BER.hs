@@ -156,8 +156,12 @@ decodeASN1Stream l = do
 		Left err -> Left (maybe (ASN1ParsingFail "unknown") id $ fromException err)
 		Right x  -> Right x
 
-encodeASN1Stream :: Monad m => [ASN1] -> Iteratee ByteString m a -> m (Either SomeException a)
-encodeASN1Stream l p = E.run (E.enumList 1 l $$ E.joinI $ enumWriteBytes $$ p)
+{-| encode an ASN1 Stream as lazy bytestring -}
+encodeASN1Stream :: [ASN1] -> Either ASN1Err L.ByteString
+encodeASN1Stream l =
+	case runIdentity $ E.run (E.enumList 1 l $$ E.joinI $ enumWriteBytes $$ E.consume) of
+		Left err -> Left (maybe (ASN1ParsingFail "unknown") id $ fromException err)
+		Right x  -> Right $ L.fromChunks x
 
 {-# DEPRECATED decodeASN1s "use stream types with decodeASN1Stream" #-}
 decodeASN1s :: L.ByteString -> Either ASN1Err [ASN1t]
@@ -169,10 +173,12 @@ decodeASN1 = either (Left) (Right . head) . decodeASN1s
 
 {-# DEPRECATED encodeASN1s "use stream types with encodeASN1Stream" #-}
 encodeASN1s :: [ASN1t] -> L.ByteString
-encodeASN1s l = case runIdentity (encodeASN1Stream (toStream l) E.consume) of
-	Left _  -> error "encoding failed"
-	Right x -> L.fromChunks x
+encodeASN1s s = case encodeASN1Stream $ toStream s of
+	Left err -> error $ show err
+	Right x  -> x
 
 {-# DEPRECATED encodeASN1 "use stream types with encodeASN1Stream" #-}
 encodeASN1 :: ASN1t -> L.ByteString
-encodeASN1 = encodeASN1s . (:[])
+encodeASN1 s = case encodeASN1Stream $ toStream [s] of
+	Left err -> error $ show err
+	Right x  -> x
