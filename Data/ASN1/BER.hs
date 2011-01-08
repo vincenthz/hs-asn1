@@ -165,11 +165,11 @@ encodeASN1Stream l =
 
 {-# DEPRECATED decodeASN1s "use stream types with decodeASN1Stream" #-}
 decodeASN1s :: L.ByteString -> Either ASN1Err [ASN1t]
-decodeASN1s l = either (Left) (Right . ofStream) $ decodeASN1Stream l
+decodeASN1s = either (Left) (Right . ofStream) . decodeASN1Stream
 
 {-# DEPRECATED decodeASN1 "use stream types with decodeASN1Stream" #-}
 decodeASN1 :: L.ByteString -> Either ASN1Err ASN1t
-decodeASN1 = either (Left) (Right . head) . decodeASN1s
+decodeASN1 = either (Left) (Right . head . ofStream) . decodeASN1Stream
 
 {-# DEPRECATED encodeASN1s "use stream types with encodeASN1Stream" #-}
 encodeASN1s :: [ASN1t] -> L.ByteString
