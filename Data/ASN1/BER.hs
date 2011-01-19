@@ -23,8 +23,11 @@ module Data.ASN1.BER
 	-- * iterate over common representation to an ASN1 stream
 	, iterateFile
 	, iterateByteString
+	, iterateEvents
 
 	-- * BER serialize functions
+	, decodeASN1Events
+	, encodeASN1Events
 	, decodeASN1Stream
 	, encodeASN1Stream
 
@@ -149,19 +152,32 @@ iterateFile path p = E.run (enumFile path $$ E.joinI $ enumReadBytes $$ p)
 iterateByteString :: Monad m => L.ByteString -> Iteratee ASN1 m a -> m (Either SomeException a)
 iterateByteString bs p = E.run (E.enumList 1 (L.toChunks bs) $$ E.joinI $ enumReadBytes $$ p)
 
+{-| iterate over asn1 events using a list enumerator over each chunks -}
+iterateEvents :: Monad m => [Raw.ASN1Event] -> Iteratee ASN1 m a -> m (Either SomeException a)
+iterateEvents evs p = E.run (E.enumList 8 evs $$ E.joinI $ enumReadRaw $$ p)
+
+{- helper to transform a Someexception from the enumerator to an ASN1Err if possible -}
+wrapASN1Err :: Either SomeException a -> Either ASN1Err a
+wrapASN1Err (Left err) = Left (maybe (ASN1ParsingFail "unknown") id $ fromException err)
+wrapASN1Err (Right x)  = Right x
+
+{-| decode a list of raw ASN1Events into a stream of ASN1 types -}
+decodeASN1Events :: [Raw.ASN1Event] -> Either ASN1Err [ASN1]
+decodeASN1Events evs = wrapASN1Err $ runIdentity (iterateEvents evs E.consume)
+
 {-| decode a lazy bytestring as an ASN1 stream -}
 decodeASN1Stream :: L.ByteString -> Either ASN1Err [ASN1]
-decodeASN1Stream l = do
-	case runIdentity (iterateByteString l E.consume) of
-		Left err -> Left (maybe (ASN1ParsingFail "unknown") id $ fromException err)
-		Right x  -> Right x
+decodeASN1Stream l = wrapASN1Err $ runIdentity (iterateByteString l E.consume)
+
+{-| encode an ASN1 Stream as raw ASN1 Events -}
+encodeASN1Events :: [ASN1] -> Either ASN1Err [Raw.ASN1Event]
+encodeASN1Events o = wrapASN1Err $ runIdentity run
+	where run = E.run (E.enumList 8 o $$ E.joinI $ enumWriteRaw $$ E.consume)
 
 {-| encode an ASN1 Stream as lazy bytestring -}
 encodeASN1Stream :: [ASN1] -> Either ASN1Err L.ByteString
-encodeASN1Stream l =
-	case runIdentity $ E.run (E.enumList 1 l $$ E.joinI $ enumWriteBytes $$ E.consume) of
-		Left err -> Left (maybe (ASN1ParsingFail "unknown") id $ fromException err)
-		Right x  -> Right $ L.fromChunks x
+encodeASN1Stream l = either Left (Right . L.fromChunks) $ wrapASN1Err $ runIdentity run
+	where run = E.run (E.enumList 1 l $$ E.joinI $ enumWriteBytes $$ E.consume)
 
 {-# DEPRECATED decodeASN1s "use stream types with decodeASN1Stream" #-}
 decodeASN1s :: L.ByteString -> Either ASN1Err [ASN1t]
