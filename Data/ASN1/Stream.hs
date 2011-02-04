@@ -1,5 +1,6 @@
 module Data.ASN1.Stream
 	( ASN1(..)
+	, ASN1Repr
 	, ASN1ConstructionType(..)
 	, getConstructedEnd
 	) where
@@ -42,6 +43,11 @@ data ASN1 =
 	| Start ASN1ConstructionType
 	| End ASN1ConstructionType
 	deriving (Show, Eq)
+
+{- associate a list of asn1 event with an ASN1 type.
+ - it's sometimes required to know the exact byte sequence leading to an ASN1 type:
+ - eg: cryptographic signature -}
+type ASN1Repr = (ASN1, [ASN1Event])
 
 getConstructedEnd :: Int -> [ASN1] -> ([ASN1],[ASN1])
 getConstructedEnd _ xs@[]                = (xs, xs)
