@@ -24,12 +24,17 @@ module Data.ASN1.BER
 	-- * iterate over common representation to an ASN1 stream
 	, iterateFile
 	, iterateByteString
+	, iterateByteStringRepr
 	, iterateEvents
+	, iterateEventsRepr
 
 	-- * BER serialize functions
+	, decodeASN1EventsRepr
 	, decodeASN1Events
 	, encodeASN1Events
+
 	, decodeASN1Stream
+	, decodeASN1StreamRepr
 	, encodeASN1Stream
 
 	-- * BER serialize functions, deprecated
@@ -157,6 +162,11 @@ enumWriteTreeRaw = E.concatMap writeTree
 enumReadBytes :: Monad m => Enumeratee ByteString ASN1 m a
 enumReadBytes = \f -> E.joinI (Raw.enumReadBytes $$ (enumReadRaw f))
 
+{-| enumReadBytes is an enumeratee converting from bytestring to ASN1
+  it transforms chunks of bytestring into chunks of ASN1 objects -}
+enumReadBytesRepr :: Monad m => Enumeratee ByteString ASN1Repr m a
+enumReadBytesRepr = \f -> E.joinI (Raw.enumReadBytes $$ (enumReadRawRepr f))
+
 {-| enumWriteBytes is an enumeratee converting from ASN1 to bytestring.
   it transforms chunks of ASN1 objects into chunks of bytestring  -}
 enumWriteBytes :: Monad m => Enumeratee ASN1 ByteString m a
@@ -170,9 +180,17 @@ iterateFile path p = E.run (enumFile path $$ E.joinI $ enumReadBytes $$ p)
 iterateByteString :: Monad m => L.ByteString -> Iteratee ASN1 m a -> m (Either SomeException a)
 iterateByteString bs p = E.run (E.enumList 1 (L.toChunks bs) $$ E.joinI $ enumReadBytes $$ p)
 
+{-| iterate over a bytestring using a list enumerator over each chunks -}
+iterateByteStringRepr :: Monad m => L.ByteString -> Iteratee ASN1Repr m a -> m (Either SomeException a)
+iterateByteStringRepr bs p = E.run (E.enumList 1 (L.toChunks bs) $$ E.joinI $ enumReadBytesRepr $$ p)
+
 {-| iterate over asn1 events using a list enumerator over each chunks -}
 iterateEvents :: Monad m => [Raw.ASN1Event] -> Iteratee ASN1 m a -> m (Either SomeException a)
 iterateEvents evs p = E.run (E.enumList 8 evs $$ E.joinI $ enumReadRaw $$ p)
+
+{-| iterate over asn1 events using a list enumerator over each chunks -}
+iterateEventsRepr :: Monad m => [Raw.ASN1Event] -> Iteratee ASN1Repr m a -> m (Either SomeException a)
+iterateEventsRepr evs p = E.run (E.enumList 8 evs $$ E.joinI $ enumReadRawRepr $$ p)
 
 {- helper to transform a Someexception from the enumerator to an ASN1Err if possible -}
 wrapASN1Err :: Either SomeException a -> Either ASN1Err a
@@ -183,9 +201,17 @@ wrapASN1Err (Right x)  = Right x
 decodeASN1Events :: [Raw.ASN1Event] -> Either ASN1Err [ASN1]
 decodeASN1Events evs = wrapASN1Err $ runIdentity (iterateEvents evs E.consume)
 
+{-| decode a list of raw ASN1Events into a stream of ASN1Repr types -}
+decodeASN1EventsRepr :: [Raw.ASN1Event] -> Either ASN1Err [ASN1Repr]
+decodeASN1EventsRepr evs = wrapASN1Err $ runIdentity (iterateEventsRepr evs E.consume)
+
 {-| decode a lazy bytestring as an ASN1 stream -}
 decodeASN1Stream :: L.ByteString -> Either ASN1Err [ASN1]
 decodeASN1Stream l = wrapASN1Err $ runIdentity (iterateByteString l E.consume)
+
+{-| decode a lazy bytestring as an ASN1repr stream -}
+decodeASN1StreamRepr :: L.ByteString -> Either ASN1Err [ASN1Repr]
+decodeASN1StreamRepr l = wrapASN1Err $ runIdentity (iterateByteStringRepr l E.consume)
 
 {-| encode an ASN1 Stream as raw ASN1 Events -}
 encodeASN1Events :: [ASN1] -> Either ASN1Err [Raw.ASN1Event]
