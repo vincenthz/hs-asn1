@@ -143,6 +143,24 @@ instance Arbitrary ASN1 where
 		, liftM UniversalString arbitrary
 		]
 
+newtype ASN1s = ASN1s [ASN1]
+
+instance Show ASN1s where
+	show (ASN1s x) = show x
+
+instance Arbitrary ASN1s where
+	arbitrary = do
+		x <- choose (0,5) :: Gen Int
+		z <- case x of
+			4 -> makeList Sequence
+			3 -> makeList Set
+			_ -> resize 2 $ listOf1 arbitrary
+		return $ ASN1s z
+		where
+			makeList str = do
+				(ASN1s l) <- arbitrary
+				return ([Start str] ++ l ++ [End str])
+
 instance Arbitrary T.ASN1t where
 	arbitrary = oneof
 		[ liftM T.Boolean arbitrary
