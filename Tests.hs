@@ -208,6 +208,14 @@ prop_asn1_event_marshalling_id x =
 	where
 		enumWriteReadRaw = \f -> E.joinI (BER.enumWriteRaw $$ (BER.enumReadRaw f))
 
+prop_asn1_event_repr_id :: ASN1s -> Bool
+prop_asn1_event_repr_id (ASN1s l) =
+	case BER.encodeASN1Events l of
+		Left _       -> False
+		Right events -> case BER.decodeASN1EventsRepr events of
+			Left _       -> False
+			Right l2repr -> map fst l2repr == l && concat (map snd l2repr) == events
+
 prop_asn1_ber_marshalling_id :: T.ASN1t -> Bool
 prop_asn1_ber_marshalling_id v = (BER.decodeASN1 . BER.encodeASN1) v == Right v
 
@@ -227,5 +235,6 @@ main = do
 	run_test "marshalling header = id" prop_header_marshalling_id
 	run_test "marshalling event = id" prop_event_marshalling_id
 	run_test "marshalling asn1 stream = id" prop_asn1_event_marshalling_id
+	run_test "marshalling asn1 repr = id" prop_asn1_event_repr_id
 	run_test "marshalling asn1 BER type = id" prop_asn1_ber_marshalling_id
 	run_test "marshalling asn1 DER type = id" prop_asn1_der_marshalling_id
