@@ -84,7 +84,7 @@ enumReadRawRepr = E.checkDone $ \k -> k (E.Chunks []) >>== loop []
 		p l k el@(Raw.Header hdr@(ASN1Header _ _ True _)) = E.head >>= \z -> case z of
 			Just el2@Raw.ConstructionBegin ->
 				let ctype = decodeConstruction hdr in
-				k (E.Chunks [(Start ctype, [el,el2])]) >>== loop ((End ctype,[]) : l)
+				k (E.Chunks [(Start ctype, [el,el2])]) >>== loop ((End ctype,[Raw.ConstructionEnd]) : l)
 			Just _  -> E.throwError (Raw.ASN1ParsingFail "expecting construction")
 			Nothing -> E.throwError (Raw.ASN1ParsingFail "expecting construction, got EOF")
 
