@@ -13,6 +13,7 @@ module Data.ASN1.BER
 	, ASN1ConstructionType(..)
 
 	-- * enumeratee to transform between ASN1 and raw
+	, enumReadRawRepr
 	, enumReadRaw
 	, enumWriteRaw
 
@@ -60,29 +61,46 @@ decodeConstruction (ASN1Header Universal 0x10 _ _) = Sequence
 decodeConstruction (ASN1Header Universal 0x11 _ _) = Set
 decodeConstruction (ASN1Header c t _ _)            = Container c t
 
-{- | enumReadRaw is an enumeratee from raw events to asn1 -}
-enumReadRaw :: Monad m => Enumeratee Raw.ASN1Event ASN1 m a
-enumReadRaw = E.checkDone $ \k -> k (E.Chunks []) >>== loop []
+{- | enumerate from 'Raw.ASN1Event' to an 'ASN1Repr' (ASN1 augmented by a list of raw asn1 events)
+ -}
+enumReadRawRepr :: Monad m => Enumeratee Raw.ASN1Event ASN1Repr m a
+enumReadRawRepr = E.checkDone $ \k -> k (E.Chunks []) >>== loop []
 	where
 		loop l = E.checkDone $ go l
 		go l k = E.head >>= \x -> case x of
-			Nothing                  ->
-				if l == [] then  k (E.Chunks []) >>== return else E.throwError (Raw.ASN1ParsingPartial)
-			Just Raw.ConstructionEnd ->
-				k (E.Chunks [head l]) >>== loop (tail l)
-			Just (Raw.Header hdr@(ASN1Header _ _ True _)) -> E.head >>= \z -> case z of
-				Nothing                    -> E.throwError (Raw.ASN1ParsingFail "expecting construction, got EOF")
-				Just Raw.ConstructionBegin ->
-					let ctype = decodeConstruction hdr in
-					k (E.Chunks [Start ctype]) >>== loop (End ctype : l)
-				Just _                     -> E.throwError (Raw.ASN1ParsingFail "expecting construction")
-			Just (Raw.Header hdr@(ASN1Header _ _ False _)) -> E.head >>= \z -> case z of
-				Nothing -> E.throwError (Raw.ASN1ParsingFail "expecting primitive, got EOF")
-				Just (Raw.Primitive p) ->
-					let (Right pr) = decodePrimitive hdr p in
-					k (E.Chunks [pr]) >>== loop l
-				Just _  -> E.throwError (Raw.ASN1ParsingFail "expecting primitive")
-			Just _ -> E.throwError (Raw.ASN1ParsingFail "boundary not a header")
+			Nothing -> if l == [] then k (E.Chunks []) >>== return else E.throwError (Raw.ASN1ParsingPartial)
+			Just el -> p l k el
+
+		{- on construction end, we pop the list context -}
+		p l k Raw.ConstructionEnd = k (E.Chunks [head l]) >>== loop (tail l)
+
+		{- on header with construction, we pop the next element in the enumerator and
+		 - expect a ConstructionBegin. the list context is prepended by the new construction -}
+		p l k el@(Raw.Header hdr@(ASN1Header _ _ True _)) = E.head >>= \z -> case z of
+			Just el2@Raw.ConstructionBegin ->
+				let ctype = decodeConstruction hdr in
+				k (E.Chunks [(Start ctype, [el,el2])]) >>== loop ((End ctype,[]) : l)
+			Just _  -> E.throwError (Raw.ASN1ParsingFail "expecting construction")
+			Nothing -> E.throwError (Raw.ASN1ParsingFail "expecting construction, got EOF")
+
+		{- on header with primtive, we pop the next element in the enumerator and
+		 - expect a Primitive -}
+		p l k el@(Raw.Header hdr@(ASN1Header _ _ False _)) = E.head >>= \z -> case z of
+			Just el2@(Raw.Primitive prim) ->
+				let (Right pr) = decodePrimitive hdr prim in
+				k (E.Chunks [(pr, [el,el2])]) >>== loop l
+			Just _  -> E.throwError (Raw.ASN1ParsingFail "expecting primitive")
+			Nothing -> E.throwError (Raw.ASN1ParsingFail "expecting primitive, got EOF")
+
+		p _ _ _ = E.throwError (Raw.ASN1ParsingFail "boundary not a header")
+
+{- | enumeratee from 'Raw.ASN1Event to 'ASN1'
+ -
+ - it's the enumerator equivalent:
+ - @enumReadRaw = map fst . enumReadRawRepr@
+ -}
+enumReadRaw :: Monad m => Enumeratee Raw.ASN1Event ASN1 m a
+enumReadRaw = \f -> E.joinI (enumReadRawRepr $$ (E.map fst f))
 
 {- | enumWriteRaw is an enumeratee from asn1 to raw events -}
 enumWriteRaw :: Monad m => Enumeratee ASN1 Raw.ASN1Event m a
