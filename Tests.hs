@@ -1,5 +1,3 @@
---{-# LANGUAGE FlexibleInstances, OverlappingInstances #-}
-
 import Test.QuickCheck
 import Text.Printf
 
