@@ -50,7 +50,7 @@ data ASN1 =
 type ASN1Repr = (ASN1, [ASN1Event])
 
 getConstructedEnd :: Int -> [ASN1] -> ([ASN1],[ASN1])
-getConstructedEnd _ xs@[]                = (xs, xs)
+getConstructedEnd _ xs@[]                = (xs, [])
 getConstructedEnd i ((x@(Start _)):xs)   = let (yz, zs) = getConstructedEnd (i+1) xs in (x:yz,zs)
 getConstructedEnd i ((x@(End _)):xs)
 	| i == 0                         = ([], xs)
