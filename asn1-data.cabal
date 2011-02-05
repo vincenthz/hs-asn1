@@ -1,5 +1,5 @@
 Name:                asn1-data
-Version:             0.4.3
+Version:             0.4.4
 Description:
     ASN1 data reader and writer in raw form with supports for high level forms of ASN1 (BER, CER and DER).
     .
@@ -23,7 +23,7 @@ Flag test
   Default:           False
 
 Library
-  Build-Depends:     base >= 3 && < 7,
+  Build-Depends:     base >= 3 && < 5,
                      bytestring,
                      text >= 0.11,
                      enumerator >= 0.4 && < 0.5,
