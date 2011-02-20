@@ -22,7 +22,7 @@ data ASN1t =
 	| UTF8String Text
 	| NumericString L.ByteString
 	| PrintableString Text
-	| T61String L.ByteString
+	| T61String Text
 	| VideoTexString L.ByteString
 	| IA5String Text
 	| UTCTime (Int, Int, Int, Int, Int, Int, Bool)

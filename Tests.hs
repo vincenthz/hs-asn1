@@ -132,7 +132,7 @@ instance Arbitrary ASN1 where
 		, liftM UTF8String arbitrary
 		, liftM NumericString arbitrary
 		, liftM PrintableString arbitraryPrintString
-		, liftM T61String arbitrary
+		, liftM T61String arbitraryIA5String
 		, liftM VideoTexString arbitrary
 		, liftM IA5String arbitraryIA5String
 		, liftM UTCTime arbitraryTime
@@ -176,7 +176,7 @@ instance Arbitrary T.ASN1t where
 		, liftM T.Set arbitraryListASN1
 		, liftM T.NumericString arbitrary
 		, liftM T.PrintableString arbitraryPrintString
-		, liftM T.T61String arbitrary
+		, liftM T.T61String arbitraryIA5String
 		, liftM T.VideoTexString arbitrary
 		, liftM T.IA5String arbitraryIA5String
 		, liftM T.UTCTime arbitraryTime

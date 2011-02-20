@@ -29,7 +29,7 @@ data ASN1 =
 	| UTF8String Text
 	| NumericString L.ByteString
 	| PrintableString Text
-	| T61String L.ByteString
+	| T61String Text
 	| VideoTexString L.ByteString
 	| IA5String Text
 	| UTCTime (Int, Int, Int, Int, Int, Int, Bool)
@@ -58,10 +58,16 @@ getConstructedEnd i ((x@(End _)):xs)
 	| otherwise = let (ys, zs) = getConstructedEnd (i-1) xs in (x:ys,zs)
 getConstructedEnd i (x:xs)               = let (ys, zs) = getConstructedEnd i xs in (x:ys,zs)
 
-getConstructedEndRepr :: Int -> [ASN1Repr] -> ([ASN1Repr],[ASN1Repr])
-getConstructedEndRepr _ xs@[]                 = (xs, [])
-getConstructedEndRepr i ((x@(Start _, _)):xs) = let (yz, zs) = getConstructedEndRepr (i+1) xs in (x:yz,zs)
-getConstructedEndRepr i ((x@(End _, _)):xs)
-	| i == 0    = ([], xs)
-	| otherwise = let (ys, zs) = getConstructedEndRepr (i-1) xs in (x:ys,zs)
-getConstructedEndRepr i (x:xs)                = let (ys, zs) = getConstructedEndRepr i xs in (x:ys,zs)
+getConstructedEndRepr :: [ASN1Repr] -> ([ASN1Repr],[ASN1Repr])
+getConstructedEndRepr = g
+	where
+		g []                 = ([], [])
+		g (x@(Start _,_):xs) = let (ys, zs) = getEnd 1 xs in (x:ys, zs)
+		g (x:xs)             = ([x],xs)
+
+		getEnd :: Int -> [ASN1Repr] -> ([ASN1Repr],[ASN1Repr])
+		getEnd _ []                    = ([], [])
+		getEnd 0 xs                    = ([], xs)
+		getEnd i ((x@(Start _, _)):xs) = let (ys, zs) = getEnd (i+1) xs in (x:ys,zs)
+		getEnd i ((x@(End _, _)):xs)   = let (ys, zs) = getEnd (i-1) xs in (x:ys,zs)
+		getEnd i (x:xs)                = let (ys, zs) = getEnd i xs in (x:ys,zs)

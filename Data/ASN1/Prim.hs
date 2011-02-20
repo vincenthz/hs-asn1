@@ -128,7 +128,7 @@ encodePrimitiveData Enumerated          = B.empty -- not implemented
 encodePrimitiveData (UTF8String b)      = putString $ encodeUtf8 b
 encodePrimitiveData (NumericString b)   = putString b
 encodePrimitiveData (PrintableString b) = putString $ encodeUtf8 b
-encodePrimitiveData (T61String b)       = putString b
+encodePrimitiveData (T61String b)       = putString $ encodeUtf8 b
 encodePrimitiveData (VideoTexString b)  = putString b
 encodePrimitiveData (IA5String b)       = putString $ encodeUtf8 b
 encodePrimitiveData (UTCTime t)         = putUTCTime t
@@ -275,7 +275,7 @@ getUTF8String :: ByteString -> Either ASN1Err ASN1
 getUTF8String = either Left (Right . UTF8String . decodeUtf8) . getString (\_ -> Nothing)
 
 getT61String :: ByteString -> Either ASN1Err ASN1
-getT61String = either Left (Right . T61String) . getString (\_ -> Nothing)
+getT61String = either Left (Right . T61String . decodeASCII) . getString (\_ -> Nothing)
 
 getVideoTexString :: ByteString -> Either ASN1Err ASN1
 getVideoTexString = either Left (Right . VideoTexString) . getString (\_ -> Nothing)

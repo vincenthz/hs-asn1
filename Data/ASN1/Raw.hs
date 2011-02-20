@@ -23,6 +23,7 @@ module Data.ASN1.Raw
 	, iterateByteString
 	, enumReadBytes
 	, enumWriteBytes
+	, toBytes
 	-- * serialize asn1 headers
 	, getHeader
 	, putHeader
@@ -43,6 +44,7 @@ import Data.Typeable
 import Data.Word
 import Data.Bits
 import Control.Monad
+import Control.Monad.Identity
 import Control.Applicative ((<|>), (<$>))
 
 data ASN1Class =
@@ -272,3 +274,8 @@ enumWriteBytes = checkDone $ \k -> k (Chunks []) >>== loop []
 				[]         -> E.throwError ASN1WritingUnexpectedConstructionEnd
 				True : tl  -> k (Chunks [putEoc]) >>== loop tl
 				False : tl -> k (Chunks []) >>== loop tl
+
+toBytes :: [ASN1Event] -> L.ByteString
+toBytes evs = case runIdentity (run (enumList 8 evs $$ joinI (enumWriteBytes $$ E.consume))) of
+	Left err -> error $ show err
+	Right l  -> L.fromChunks l
