@@ -7,7 +7,6 @@ module Data.ASN1.Types
 import qualified Data.ASN1.Stream as S
 import qualified Data.ByteString.Lazy as L
 import Data.ByteString (ByteString)
-import Data.Text.Lazy (Text)
 import Data.ASN1.Raw (ASN1Class, ASN1Tag)
 
 data ASN1t =
@@ -19,20 +18,20 @@ data ASN1t =
 	| OID [Integer]
 	| Real Double
 	| Enumerated
-	| UTF8String Text
+	| UTF8String String
 	| NumericString L.ByteString
-	| PrintableString Text
-	| T61String Text
+	| PrintableString String
+	| T61String String
 	| VideoTexString L.ByteString
-	| IA5String Text
+	| IA5String String
 	| UTCTime (Int, Int, Int, Int, Int, Int, Bool)
 	| GeneralizedTime (Int, Int, Int, Int, Int, Int, Bool)
 	| GraphicString L.ByteString
 	| VisibleString L.ByteString
 	| GeneralString L.ByteString
-	| UniversalString Text
+	| UniversalString String
 	| CharacterString L.ByteString
-	| BMPString Text
+	| BMPString String
 	| Other ASN1Class ASN1Tag ByteString
 	| Sequence [ASN1t]
 	| Set [ASN1t]

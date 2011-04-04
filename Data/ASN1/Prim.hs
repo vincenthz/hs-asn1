@@ -125,20 +125,20 @@ encodePrimitiveData Null                = B.empty
 encodePrimitiveData (OID oid)           = putOID oid
 encodePrimitiveData (Real _)            = B.empty -- not implemented
 encodePrimitiveData Enumerated          = B.empty -- not implemented
-encodePrimitiveData (UTF8String b)      = putString $ encodeUtf8 b
+encodePrimitiveData (UTF8String b)      = putString $ encodeUtf8 $ T.pack b
 encodePrimitiveData (NumericString b)   = putString b
-encodePrimitiveData (PrintableString b) = putString $ encodeUtf8 b
-encodePrimitiveData (T61String b)       = putString $ encodeUtf8 b
+encodePrimitiveData (PrintableString b) = putString $ encodeUtf8 $ T.pack b
+encodePrimitiveData (T61String b)       = putString $ encodeUtf8 $ T.pack b
 encodePrimitiveData (VideoTexString b)  = putString b
-encodePrimitiveData (IA5String b)       = putString $ encodeUtf8 b
+encodePrimitiveData (IA5String b)       = putString $ encodeUtf8 $ T.pack b
 encodePrimitiveData (UTCTime t)         = putUTCTime t
 encodePrimitiveData (GeneralizedTime t) = putGeneralizedTime t
 encodePrimitiveData (GraphicString b)   = putString b
 encodePrimitiveData (VisibleString b)   = putString b
 encodePrimitiveData (GeneralString b)   = putString b
-encodePrimitiveData (UniversalString b) = putString $ encodeUtf32BE b
+encodePrimitiveData (UniversalString b) = putString $ encodeUtf32BE $ T.pack b
 encodePrimitiveData (CharacterString b) = putString b
-encodePrimitiveData (BMPString b)       = putString $ encodeUCS2BE b
+encodePrimitiveData (BMPString b)       = putString $ encodeUCS2BE $ T.pack b
 encodePrimitiveData (Other _ _ b)       = b
 encodePrimitiveData o                   = error ("not a primitive " ++ show o)
 
@@ -269,19 +269,19 @@ getNumericString :: ByteString -> Either ASN1Err ASN1
 getNumericString = either Left (Right . NumericString) . getString (\_ -> Nothing)
 
 getPrintableString :: ByteString -> Either ASN1Err ASN1
-getPrintableString = either Left (Right . PrintableString . decodeASCII) . getString (\_ -> Nothing)
+getPrintableString = either Left (Right . PrintableString . T.unpack . decodeASCII) . getString (\_ -> Nothing)
 
 getUTF8String :: ByteString -> Either ASN1Err ASN1
-getUTF8String = either Left (Right . UTF8String . decodeUtf8) . getString (\_ -> Nothing)
+getUTF8String = either Left (Right . UTF8String . T.unpack . decodeUtf8) . getString (\_ -> Nothing)
 
 getT61String :: ByteString -> Either ASN1Err ASN1
-getT61String = either Left (Right . T61String . decodeASCII) . getString (\_ -> Nothing)
+getT61String = either Left (Right . T61String . T.unpack . decodeASCII) . getString (\_ -> Nothing)
 
 getVideoTexString :: ByteString -> Either ASN1Err ASN1
 getVideoTexString = either Left (Right . VideoTexString) . getString (\_ -> Nothing)
 
 getIA5String :: ByteString -> Either ASN1Err ASN1
-getIA5String = either Left (Right . IA5String . decodeASCII) . getString (\_ -> Nothing)
+getIA5String = either Left (Right . IA5String . T.unpack . decodeASCII) . getString (\_ -> Nothing)
 
 getGraphicString :: ByteString -> Either ASN1Err ASN1
 getGraphicString = either Left (Right . GraphicString) . getString (\_ -> Nothing)
@@ -293,13 +293,13 @@ getGeneralString :: ByteString -> Either ASN1Err ASN1
 getGeneralString = either Left (Right . GeneralString) . getString (\_ -> Nothing)
 
 getUniversalString :: ByteString -> Either ASN1Err ASN1
-getUniversalString = either Left (Right . UniversalString . decodeUtf32BE) . getString (\_ -> Nothing)
+getUniversalString = either Left (Right . UniversalString . T.unpack . decodeUtf32BE) . getString (\_ -> Nothing)
 
 getCharacterString :: ByteString -> Either ASN1Err ASN1
 getCharacterString = either Left (Right . CharacterString) . getString (\_ -> Nothing)
 
 getBMPString :: ByteString -> Either ASN1Err ASN1
-getBMPString = either Left (Right . BMPString . decodeUCS2BE) . getString (\_ -> Nothing)
+getBMPString = either Left (Right . BMPString . T.unpack . decodeUCS2BE) . getString (\_ -> Nothing)
 
 getNull :: ByteString -> Either ASN1Err ASN1
 getNull s = if B.length s == 0 then Right Null else Left $ ASN1Misc "Null: data length not within bound"
