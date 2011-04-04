@@ -14,6 +14,7 @@ import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as L
 import qualified Data.Text.Lazy as T
 import qualified Data.Enumerator as E
+import qualified Data.Enumerator.List as EL
 import Data.Enumerator (($$))
 
 import Control.Monad
@@ -192,7 +193,7 @@ prop_header_marshalling_id v = (getHeader . putHeader) v == Right v
 
 prop_event_marshalling_id :: ASN1Events -> Bool
 prop_event_marshalling_id (ASN1Events e) =
-	let r = runIdentity $ E.run (E.enumList 1 e $$ E.joinI $ enumWriteReadBytes $$ E.consume) in
+	let r = runIdentity $ E.run (E.enumList 1 e $$ E.joinI $ enumWriteReadBytes $$ EL.consume) in
 	case r of
 		Left _  -> False
 		Right z -> e == z
@@ -201,7 +202,7 @@ prop_event_marshalling_id (ASN1Events e) =
 
 prop_asn1_event_marshalling_id :: ASN1 -> Bool
 prop_asn1_event_marshalling_id x =
-	let r = runIdentity $ E.run (E.enumList 1 [x] $$ E.joinI $ enumWriteReadRaw $$ E.consume) in
+	let r = runIdentity $ E.run (E.enumList 1 [x] $$ E.joinI $ enumWriteReadRaw $$ EL.consume) in
 	case r of
 		Left _  -> False
 		Right z -> [x] == z

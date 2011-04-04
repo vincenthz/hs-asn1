@@ -61,8 +61,9 @@ import Control.Monad.Identity
 import Control.Exception
 
 import Data.Enumerator (Iteratee, Enumeratee, ($$), (>>==))
-import Data.Enumerator.IO
+import Data.Enumerator.Binary (enumFile)
 import qualified Data.Enumerator as E
+import qualified Data.Enumerator.List as EL
 
 {- | Check if the length is the minimum possible and it's not indefinite -}
 checkLength :: ASN1Length -> Maybe ASN1Err
@@ -79,7 +80,7 @@ checkRawDER :: Monad m => Enumeratee Raw.ASN1Event Raw.ASN1Event m a
 checkRawDER = E.checkDone $ \k -> k (E.Chunks []) >>== loop
 	where
 		loop = E.checkDone go
-		go k = E.head >>= \x -> case x of
+		go k = EL.head >>= \x -> case x of
 			Nothing -> k (E.Chunks []) >>== return
 			Just l  -> case tyCheck l of
 				Nothing  -> k (E.Chunks [l]) >>== loop
@@ -141,29 +142,29 @@ wrapASN1Err (Right x)  = Right x
 
 {-| decode a list of raw ASN1Events into a stream of ASN1 types -}
 decodeASN1Events :: [Raw.ASN1Event] -> Either ASN1Err [ASN1]
-decodeASN1Events evs = wrapASN1Err $ runIdentity (iterateEvents evs E.consume)
+decodeASN1Events evs = wrapASN1Err $ runIdentity (iterateEvents evs EL.consume)
 
 {-| decode a list of raw ASN1Events into a stream of ASN1Repr types -}
 decodeASN1EventsRepr :: [Raw.ASN1Event] -> Either ASN1Err [ASN1Repr]
-decodeASN1EventsRepr evs = wrapASN1Err $ runIdentity (iterateEventsRepr evs E.consume)
+decodeASN1EventsRepr evs = wrapASN1Err $ runIdentity (iterateEventsRepr evs EL.consume)
 
 {-| decode a lazy bytestring as an ASN1 stream -}
 decodeASN1Stream :: L.ByteString -> Either ASN1Err [ASN1]
-decodeASN1Stream l = wrapASN1Err $ runIdentity (iterateByteString l E.consume)
+decodeASN1Stream l = wrapASN1Err $ runIdentity (iterateByteString l EL.consume)
 
 {-| decode a lazy bytestring as an ASN1repr stream -}
 decodeASN1StreamRepr :: L.ByteString -> Either ASN1Err [ASN1Repr]
-decodeASN1StreamRepr l = wrapASN1Err $ runIdentity (iterateByteStringRepr l E.consume)
+decodeASN1StreamRepr l = wrapASN1Err $ runIdentity (iterateByteStringRepr l EL.consume)
 
 {-| encode an ASN1 Stream as raw ASN1 Events -}
 encodeASN1Events :: [ASN1] -> Either ASN1Err [Raw.ASN1Event]
 encodeASN1Events o = wrapASN1Err $ runIdentity run
-	where run = E.run (E.enumList 8 o $$ E.joinI $ enumWriteRaw $$ E.consume)
+	where run = E.run (E.enumList 8 o $$ E.joinI $ enumWriteRaw $$ EL.consume)
 
 {-| encode an ASN1 Stream as lazy bytestring -}
 encodeASN1Stream :: [ASN1] -> Either ASN1Err L.ByteString
 encodeASN1Stream l = either Left (Right . L.fromChunks) $ wrapASN1Err $ runIdentity run
-	where run = E.run (E.enumList 1 l $$ E.joinI $ enumWriteBytes $$ E.consume)
+	where run = E.run (E.enumList 1 l $$ E.joinI $ enumWriteBytes $$ EL.consume)
 
 {-# DEPRECATED decodeASN1s "use stream types with decodeASN1Stream" #-}
 decodeASN1s :: L.ByteString -> Either ASN1Err [ASN1t]

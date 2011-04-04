@@ -31,7 +31,8 @@ module Data.ASN1.Raw
 
 import Data.Enumerator hiding (head, length, map)
 import qualified Data.Enumerator as E
-import Data.Enumerator.IO
+import qualified Data.Enumerator.List as EL
+import Data.Enumerator.Binary (enumFile)
 import Data.Attoparsec.Enumerator
 import Data.Attoparsec
 import qualified Data.Attoparsec as A
@@ -262,7 +263,7 @@ enumWriteBytes = checkDone $ \k -> k (Chunks []) >>== loop []
 	where
 		putEoc    = putHeader $ ASN1Header Universal 0 False (LenShort 0)
 		loop eocs = checkDone $ go eocs
-		go eocs k = E.head >>= \x -> case x of
+		go eocs k = EL.head >>= \x -> case x of
 			Nothing                ->
 				if eocs == [] then k (Chunks []) >>== return else E.throwError ASN1WritingUnexpectedInputEOF
 			Just (Header hdr@(ASN1Header _ _ True len)) ->
@@ -276,6 +277,6 @@ enumWriteBytes = checkDone $ \k -> k (Chunks []) >>== loop []
 				False : tl -> k (Chunks []) >>== loop tl
 
 toBytes :: [ASN1Event] -> L.ByteString
-toBytes evs = case runIdentity (run (enumList 8 evs $$ joinI (enumWriteBytes $$ E.consume))) of
+toBytes evs = case runIdentity (run (enumList 8 evs $$ joinI (enumWriteBytes $$ EL.consume))) of
 	Left err -> error $ show err
 	Right l  -> L.fromChunks l

@@ -57,9 +57,10 @@ import Control.Exception
 import qualified Data.ByteString.Lazy as L
 import Data.ByteString (ByteString)
 
-import Data.Enumerator.IO
+import Data.Enumerator.Binary (enumFile)
 import Data.Enumerator (Iteratee(..), Enumeratee, ($$), (>>==))
 import qualified Data.Enumerator as E
+import qualified Data.Enumerator.List as EL
 
 decodeConstruction :: ASN1Header -> ASN1ConstructionType
 decodeConstruction (ASN1Header Universal 0x10 _ _) = Sequence
@@ -72,7 +73,7 @@ enumReadRawRepr :: Monad m => Enumeratee Raw.ASN1Event ASN1Repr m a
 enumReadRawRepr = E.checkDone $ \k -> k (E.Chunks []) >>== loop []
 	where
 		loop l = E.checkDone $ go l
-		go l k = E.head >>= \x -> case x of
+		go l k = EL.head >>= \x -> case x of
 			Nothing -> if l == [] then k (E.Chunks []) >>== return else E.throwError (Raw.ASN1ParsingPartial)
 			Just el -> p l k el
 
@@ -81,7 +82,7 @@ enumReadRawRepr = E.checkDone $ \k -> k (E.Chunks []) >>== loop []
 
 		{- on header with construction, we pop the next element in the enumerator and
 		 - expect a ConstructionBegin. the list context is prepended by the new construction -}
-		p l k el@(Raw.Header hdr@(ASN1Header _ _ True _)) = E.head >>= \z -> case z of
+		p l k el@(Raw.Header hdr@(ASN1Header _ _ True _)) = EL.head >>= \z -> case z of
 			Just el2@Raw.ConstructionBegin ->
 				let ctype = decodeConstruction hdr in
 				k (E.Chunks [(Start ctype, [el,el2])]) >>== loop ((End ctype,[Raw.ConstructionEnd]) : l)
@@ -90,7 +91,7 @@ enumReadRawRepr = E.checkDone $ \k -> k (E.Chunks []) >>== loop []
 
 		{- on header with primtive, we pop the next element in the enumerator and
 		 - expect a Primitive -}
-		p l k el@(Raw.Header hdr@(ASN1Header _ _ False _)) = E.head >>= \z -> case z of
+		p l k el@(Raw.Header hdr@(ASN1Header _ _ False _)) = EL.head >>= \z -> case z of
 			Just el2@(Raw.Primitive prim) ->
 				let (Right pr) = decodePrimitive hdr prim in
 				k (E.Chunks [(pr, [el,el2])]) >>== loop l
@@ -116,7 +117,7 @@ enumWriteTree = do
 	E.checkDone $ \k -> k (E.Chunks []) >>== loop
 	where
 		loop = E.checkDone $ go
-		go k = E.head >>= \x -> case x of
+		go k = EL.head >>= \x -> case x of
 			Nothing          -> k (E.Chunks []) >>== return
 			Just n@(Start _) -> consumeTillEnd >>= \y -> k (E.Chunks [(n, y)] ) >>== loop
 			Just p           -> k (E.Chunks [(p, [])] ) >>== loop
@@ -199,29 +200,29 @@ wrapASN1Err (Right x)  = Right x
 
 {-| decode a list of raw ASN1Events into a stream of ASN1 types -}
 decodeASN1Events :: [Raw.ASN1Event] -> Either ASN1Err [ASN1]
-decodeASN1Events evs = wrapASN1Err $ runIdentity (iterateEvents evs E.consume)
+decodeASN1Events evs = wrapASN1Err $ runIdentity (iterateEvents evs EL.consume)
 
 {-| decode a list of raw ASN1Events into a stream of ASN1Repr types -}
 decodeASN1EventsRepr :: [Raw.ASN1Event] -> Either ASN1Err [ASN1Repr]
-decodeASN1EventsRepr evs = wrapASN1Err $ runIdentity (iterateEventsRepr evs E.consume)
+decodeASN1EventsRepr evs = wrapASN1Err $ runIdentity (iterateEventsRepr evs EL.consume)
 
 {-| decode a lazy bytestring as an ASN1 stream -}
 decodeASN1Stream :: L.ByteString -> Either ASN1Err [ASN1]
-decodeASN1Stream l = wrapASN1Err $ runIdentity (iterateByteString l E.consume)
+decodeASN1Stream l = wrapASN1Err $ runIdentity (iterateByteString l EL.consume)
 
 {-| decode a lazy bytestring as an ASN1repr stream -}
 decodeASN1StreamRepr :: L.ByteString -> Either ASN1Err [ASN1Repr]
-decodeASN1StreamRepr l = wrapASN1Err $ runIdentity (iterateByteStringRepr l E.consume)
+decodeASN1StreamRepr l = wrapASN1Err $ runIdentity (iterateByteStringRepr l EL.consume)
 
 {-| encode an ASN1 Stream as raw ASN1 Events -}
 encodeASN1Events :: [ASN1] -> Either ASN1Err [Raw.ASN1Event]
 encodeASN1Events o = wrapASN1Err $ runIdentity run
-	where run = E.run (E.enumList 8 o $$ E.joinI $ enumWriteRaw $$ E.consume)
+	where run = E.run (E.enumList 8 o $$ E.joinI $ enumWriteRaw $$ EL.consume)
 
 {-| encode an ASN1 Stream as lazy bytestring -}
 encodeASN1Stream :: [ASN1] -> Either ASN1Err L.ByteString
 encodeASN1Stream l = either Left (Right . L.fromChunks) $ wrapASN1Err $ runIdentity run
-	where run = E.run (E.enumList 1 l $$ E.joinI $ enumWriteBytes $$ E.consume)
+	where run = E.run (E.enumList 1 l $$ E.joinI $ enumWriteBytes $$ EL.consume)
 
 {-# DEPRECATED decodeASN1s "use stream types with decodeASN1Stream" #-}
 decodeASN1s :: L.ByteString -> Either ASN1Err [ASN1t]
