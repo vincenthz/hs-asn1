@@ -113,11 +113,11 @@ arbitraryListASN1 = choose (0, 20) >>= \len -> replicateM len (suchThat arbitrar
 arbitraryPrintString = do
 	let printableString = (['a'..'z'] ++ ['A'..'Z'] ++ ['0'..'9'] ++ " ()+,-./:=?")
 	x <- replicateM 21 (elements printableString)
-	return $ T.pack x
+	return $ x
 
 arbitraryIA5String = do
 	x <- replicateM 21 (elements $ map toEnum [0..127])
-	return $ T.pack x
+	return $ x
 
 instance Arbitrary ASN1 where
 	arbitrary = oneof
