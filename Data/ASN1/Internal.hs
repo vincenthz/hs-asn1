@@ -42,3 +42,20 @@ bytesOfInt i
 		nints = reverse $ plusOne $ reverse $ map complement $ uints
 		plusOne []     = [1]
 		plusOne (x:xs) = if x == 0xff then 0 : plusOne xs else (x+1) : xs
+
+{- | 
+
+ASN1 often uses a particular kind of 7-bit encoding of integers like
+in the case of long tags or encoding of integer component of OID's.
+Use this function for such an encoding. Assumes a positive integer.
+
+-}
+
+asn1SevenBit :: (Bits i, Integral i) => i -> ByteString
+asn1SevenBit i = B.reverse . turnUpBits $ B.unfoldr unf i
+    where unf x | x == 0 = Nothing
+                | x >  0 = let out  = x .&. 0x7F
+                               rest = shiftR x 7
+                           in Just (fromIntegral out, rest)
+          turnUpBits = snd . B.mapAccumL mp 0
+                     where mp a w = (0x80, w .|. a)
