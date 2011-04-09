@@ -3,6 +3,7 @@ module Data.ASN1.Internal
 	, intOfBytes
 	, bytesOfUInt
 	, bytesOfInt
+        , asn1SevenBit
 	) where
 
 import Data.Word
