@@ -218,11 +218,14 @@ getLength = do
 
 {- | putIdentifier encode an ASN1 Identifier into a marshalled value -}
 putHeader :: ASN1Header -> ByteString
-putHeader (ASN1Header cl tag pc len) = B.pack
-	( putFirstWord (cl, pc, if tag < 0x1f then tag else 0x1f)
-	: (if tag >= 0x1f then putTagLong tag else [])
-	++ putLength len
-	)
+putHeader (ASN1Header cl tag pc len) = B.append tgBytes lenBytes
+        where cli   = shiftL (fromIntegral $ fromEnum cl) 6
+              pcval = shiftL (if pc then 0x1 else 0x0) 5
+              w1    = if tag < 0x1f then fromIntegral tag else 0x1f
+              word1 = cli .|. pcval .|. w1
+              tgBytes = if tag < 0x1f then B.singleton word1
+                        else B.cons word1 $ asn1SevenBit tag
+              lenBytes = B.pack $ putLength len
 
 {- put first word of a header -}
 putFirstWord :: (ASN1Class, Bool, ASN1Tag) -> Word8
