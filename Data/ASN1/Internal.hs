@@ -60,3 +60,15 @@ asn1SevenBit i = B.reverse . turnUpBits $ B.unfoldr unf i
                            in Just (fromIntegral out, rest)
           turnUpBits = snd . B.mapAccumL mp 0
                      where mp a w = (0x80, w .|. a)
+
+{- 
+
+   Here is the description of the algorithm of the above encoding: The
+integer is chunked up 7-bit bytes. Each of these 7bit chunks are
+encoded one byte each. All the octects except the last one has its 8th
+bit set. The function turnUpBits this turning up of bits. Note that
+after the unfoldr the number is in reverse order hence we use a
+mapAccumL.  The first byte will not have its bit turned on but all
+others will.
+
+-}
