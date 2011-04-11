@@ -63,12 +63,16 @@ asn1SevenBit i = B.reverse . turnUpBits $ B.unfoldr unf i
 
 {- 
 
-   Here is the description of the algorithm of the above encoding: The
-integer is chunked up 7-bit bytes. Each of these 7bit chunks are
-encoded one byte each. All the octects except the last one has its 8th
-bit set. The function turnUpBits this turning up of bits. Note that
-after the unfoldr the number is in reverse order hence we use a
-mapAccumL.  The first byte will not have its bit turned on but all
-others will.
+   Here is the description of the algorithm of the above encoding: 
+
+1. The integer is chunked up into 7-bit groups. Each of these 7bit
+   chunks are encoded as a single octect.
+
+2. All the octects except the last one has its 8th bit set.
+
+3. The function turnUpBits does this turning up of bits. Note that
+   after the unfoldr the number is in reverse order hence we use a
+   mapAccumL.  The first byte will not have its bit turned on but all
+   others will.
 
 -}
