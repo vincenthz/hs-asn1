@@ -227,25 +227,6 @@ putHeader (ASN1Header cl tag pc len) = B.append tgBytes lenBytes
                         else B.cons word1 $ putVarEncodingIntegral tag
               lenBytes = B.pack $ putLength len
 
-{- put first word of a header -}
-putFirstWord :: (ASN1Class, Bool, ASN1Tag) -> Word8
-putFirstWord (cl,pc,t1) = (cli `shiftL` 6) .|. (pcval `shiftL` 5) .|. (fromIntegral t1 .&. 0x1f)
-	where
-		cli   = fromIntegral $ fromEnum cl
-		pcval = if pc then 0x1 else 0x0
-
-{- marshall helper for putIdentifier to serialize long tag number -}
-putTagLong :: ASN1Tag -> [Word8]
-putTagLong n = revSethighbits $ split7bits n
-	where
-		revSethighbits :: [Word8] -> [Word8]
-		revSethighbits []     = []
-		revSethighbits (x:xs) = reverse $ (x : map (\i -> setBit i 7) xs)
-		split7bits i
-			| i == 0    = []
-			| i <= 0x7f = [ fromIntegral i ]
-			| otherwise = fromIntegral (i .&. 0x7f) : split7bits (i `shiftR` 7)
-
 {- | putLength encode a length into a ASN1 length.
  - see getLength for the encoding rules -}
 putLength :: ASN1Length -> [Word8]
