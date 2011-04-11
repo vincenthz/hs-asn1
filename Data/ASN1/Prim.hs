@@ -386,13 +386,10 @@ putString l = B.concat $ L.toChunks l
 
 {- no enforce check that oid1 is between [0..2] and oid2 is between [0..39] -}
 putOID :: [Integer] -> ByteString
-putOID oids = B.pack $ eoid
+putOID oids = B.cons eoidclass subeoids
 	where
 		(oid1:oid2:suboids) = oids
 		eoidclass           = fromIntegral (oid1 * 40 + oid2)
-		ungroupSubOID x     = unfoldr (\i -> if i == 0 then Nothing else Just (fromIntegral (i .&. 0x7f), i `shiftR` 7)) x
-		setHighBits []      = []
-		setHighBits [x]     = [x]
-		setHighBits (x:xs)  = setBit x 7 : setHighBits xs
-		subeoids            = concatMap (setHighBits . reverse . ungroupSubOID) suboids
-		eoid                = eoidclass : subeoids
+		encode x | x == 0    = B.singleton 0
+		       	 | otherwise = putVarEncodingIntegral x
+		subeoids  = B.concat $ map encode suboids
