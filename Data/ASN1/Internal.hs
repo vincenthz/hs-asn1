@@ -3,6 +3,7 @@ module Data.ASN1.Internal
 	, intOfBytes
 	, bytesOfUInt
 	, bytesOfInt
+        , putVarEncodingIntegral
 	) where
 
 import Data.Word
@@ -42,3 +43,30 @@ bytesOfInt i
 		nints = reverse $ plusOne $ reverse $ map complement $ uints
 		plusOne []     = [1]
 		plusOne (x:xs) = if x == 0xff then 0 : plusOne xs else (x+1) : xs
+
+{- | 
+
+ASN1 often uses a particular kind of 7-bit encoding of integers like
+in the case of long tags or encoding of integer component of OID's.
+Use this function for such an encoding. Assumes a positive integer.
+
+Here is the description of the algorithm of the above encoding: 
+
+1. The integer is chunked up into 7-bit groups. Each of these 7bit
+   chunks are encoded as a single octet.
+
+2. All the octets except the last one has its 8th bit set.
+
+-}
+
+putVarEncodingIntegral :: (Bits i, Integral i) => i -> ByteString
+putVarEncodingIntegral i = B.reverse $ B.unfoldr genOctets (i,True)
+
+-- The octect generator.
+genOctets :: (Bits i, Integral i) => (i,Bool) -> Maybe (Word8, (i,Bool))
+genOctets (x,firstOctet) | x == 0 = Nothing
+                         | x > 0  = let outp = fromIntegral (x .&. 0x7F)
+                                        rest = shiftR x 7
+                                        out  = if firstOctet then outp
+                                               else setBit outp 7
+                                    in Just (out, (rest,False))
