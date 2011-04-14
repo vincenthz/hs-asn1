@@ -1,4 +1,7 @@
 import Test.QuickCheck
+import Test.Framework(defaultMain, testGroup)
+import Test.Framework.Providers.QuickCheck2(testProperty)
+
 import Text.Printf
 
 import Data.ASN1.Raw
@@ -223,19 +226,14 @@ prop_asn1_ber_marshalling_id v = (BER.decodeASN1 . BER.encodeASN1) v == Right v
 prop_asn1_der_marshalling_id :: T.ASN1t -> Bool
 prop_asn1_der_marshalling_id v = (DER.decodeASN1 . DER.encodeASN1) v == Right v
 
-args = stdArgs
-	{ replay     = Nothing
-	, maxSuccess = 500
-	, maxDiscard = 2000
-	, maxSize    = 500
-	}
 
-run_test n t = putStr ("  " ++ n ++ " ... ") >> hFlush stdout >> quickCheckWith args t
+marshallingTests = testGroup "Marshalling" [
+                             testProperty "Header" prop_header_marshalling_id
+                            ,testProperty "Event"  prop_event_marshalling_id
+                            ,testProperty "Stream" prop_asn1_event_marshalling_id
+                            ,testProperty "Repr"  prop_asn1_event_repr_id
+                            ,testProperty "BER"  prop_asn1_ber_marshalling_id
+                            ,testProperty "DER" prop_asn1_der_marshalling_id
+                    ]
 
-main = do
-	run_test "marshalling header = id" prop_header_marshalling_id
-	run_test "marshalling event = id" prop_event_marshalling_id
-	run_test "marshalling asn1 stream = id" prop_asn1_event_marshalling_id
-	run_test "marshalling asn1 repr = id" prop_asn1_event_repr_id
-	run_test "marshalling asn1 BER type = id" prop_asn1_ber_marshalling_id
-	run_test "marshalling asn1 DER type = id" prop_asn1_der_marshalling_id
+main = do defaultMain [marshallingTests]
