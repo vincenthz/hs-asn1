@@ -45,6 +45,7 @@ Executable           Tests
   if flag(test)
     Buildable:       True
     Build-depends:   base >= 3 && < 7, HUnit, QuickCheck >= 2, bytestring
+                    ,test-framework>=0.3,test-framework-quickcheck2>=0.2
   else
     Buildable:       False
 
