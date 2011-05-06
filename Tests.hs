@@ -227,13 +227,13 @@ prop_asn1_der_marshalling_id :: T.ASN1t -> Bool
 prop_asn1_der_marshalling_id v = (DER.decodeASN1 . DER.encodeASN1) v == Right v
 
 
-marshallingTests = testGroup "Marshalling" [
-                             testProperty "Header" prop_header_marshalling_id
-                            ,testProperty "Event"  prop_event_marshalling_id
-                            ,testProperty "Stream" prop_asn1_event_marshalling_id
-                            ,testProperty "Repr"  prop_asn1_event_repr_id
-                            ,testProperty "BER"  prop_asn1_ber_marshalling_id
-                            ,testProperty "DER" prop_asn1_der_marshalling_id
-                    ]
+marshallingTests = testGroup "Marshalling"
+	[ testProperty "Header" prop_header_marshalling_id
+	, testProperty "Event"  prop_event_marshalling_id
+	, testProperty "Stream" prop_asn1_event_marshalling_id
+	, testProperty "Repr"  prop_asn1_event_repr_id
+	, testProperty "BER"  prop_asn1_ber_marshalling_id
+	, testProperty "DER" prop_asn1_der_marshalling_id
+	]
 
 main = do defaultMain [marshallingTests]
