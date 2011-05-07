@@ -8,7 +8,7 @@
 --
 -- ASN1 Events describe the low level un-interpreted
 -- structure of an ASN1 document. it's a direct
--- representation of the raw bytes, and is encoding agnostic.
+-- representation of the raw bytes, and it's encoding agnostic.
 --
 
 module Data.ASN1.Event
