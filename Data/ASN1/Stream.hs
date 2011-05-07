@@ -6,7 +6,7 @@ module Data.ASN1.Stream
 	, getConstructedEndRepr
 	) where
 
-import Data.ASN1.Raw
+import Data.ASN1.Event
 import Data.ByteString (ByteString)
 import qualified Data.ByteString.Lazy as L
 
@@ -42,6 +42,7 @@ data ASN1 =
 	| Other ASN1Class ASN1Tag ByteString
 	| Start ASN1ConstructionType
 	| End ASN1ConstructionType
+	| Event [ASN1Event]
 	deriving (Show, Eq)
 
 {- associate a list of asn1 event with an ASN1 type.

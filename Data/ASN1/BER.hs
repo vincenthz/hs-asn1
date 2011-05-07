@@ -44,8 +44,8 @@ module Data.ASN1.BER
 	, encodeASN1s
 	) where
 
-import Data.ASN1.Raw (ASN1Header(..), ASN1Class(..), ASN1Err(..))
-import qualified Data.ASN1.Raw as Raw
+import Data.ASN1.Event (ASN1Header(..), ASN1Class(..), ASN1Err(..))
+import qualified Data.ASN1.Event as Event
 
 import Data.ASN1.Stream
 import Data.ASN1.Types (ofStream, toStream, ASN1t)
@@ -67,49 +67,49 @@ decodeConstruction (ASN1Header Universal 0x10 _ _) = Sequence
 decodeConstruction (ASN1Header Universal 0x11 _ _) = Set
 decodeConstruction (ASN1Header c t _ _)            = Container c t
 
-{- | enumerate from 'Raw.ASN1Event' to an 'ASN1Repr' (ASN1 augmented by a list of raw asn1 events)
+{- | enumerate from 'Event.ASN1Event' to an 'ASN1Repr' (ASN1 augmented by a list of raw asn1 events)
  -}
-enumReadRawRepr :: Monad m => Enumeratee Raw.ASN1Event ASN1Repr m a
+enumReadRawRepr :: Monad m => Enumeratee Event.ASN1Event ASN1Repr m a
 enumReadRawRepr = E.checkDone $ \k -> k (E.Chunks []) >>== loop []
 	where
 		loop l = E.checkDone $ go l
 		go l k = EL.head >>= \x -> case x of
-			Nothing -> if l == [] then k (E.Chunks []) >>== return else E.throwError (Raw.ASN1ParsingPartial)
+			Nothing -> if l == [] then k (E.Chunks []) >>== return else E.throwError (Event.ASN1ParsingPartial)
 			Just el -> p l k el
 
 		{- on construction end, we pop the list context -}
-		p l k Raw.ConstructionEnd = k (E.Chunks [head l]) >>== loop (tail l)
+		p l k Event.ConstructionEnd = k (E.Chunks [head l]) >>== loop (tail l)
 
 		{- on header with construction, we pop the next element in the enumerator and
 		 - expect a ConstructionBegin. the list context is prepended by the new construction -}
-		p l k el@(Raw.Header hdr@(ASN1Header _ _ True _)) = EL.head >>= \z -> case z of
-			Just el2@Raw.ConstructionBegin ->
+		p l k el@(Event.Header hdr@(ASN1Header _ _ True _)) = EL.head >>= \z -> case z of
+			Just el2@Event.ConstructionBegin ->
 				let ctype = decodeConstruction hdr in
-				k (E.Chunks [(Start ctype, [el,el2])]) >>== loop ((End ctype,[Raw.ConstructionEnd]) : l)
-			Just _  -> E.throwError (Raw.ASN1ParsingFail "expecting construction")
-			Nothing -> E.throwError (Raw.ASN1ParsingFail "expecting construction, got EOF")
+				k (E.Chunks [(Start ctype, [el,el2])]) >>== loop ((End ctype,[Event.ConstructionEnd]) : l)
+			Just _  -> E.throwError (Event.ASN1ParsingFail "expecting construction")
+			Nothing -> E.throwError (Event.ASN1ParsingFail "expecting construction, got EOF")
 
 		{- on header with primtive, we pop the next element in the enumerator and
 		 - expect a Primitive -}
-		p l k el@(Raw.Header hdr@(ASN1Header _ _ False _)) = EL.head >>= \z -> case z of
-			Just el2@(Raw.Primitive prim) ->
+		p l k el@(Event.Header hdr@(ASN1Header _ _ False _)) = EL.head >>= \z -> case z of
+			Just el2@(Event.Primitive prim) ->
 				let (Right pr) = decodePrimitive hdr prim in
 				k (E.Chunks [(pr, [el,el2])]) >>== loop l
-			Just _  -> E.throwError (Raw.ASN1ParsingFail "expecting primitive")
-			Nothing -> E.throwError (Raw.ASN1ParsingFail "expecting primitive, got EOF")
+			Just _  -> E.throwError (Event.ASN1ParsingFail "expecting primitive")
+			Nothing -> E.throwError (Event.ASN1ParsingFail "expecting primitive, got EOF")
 
-		p _ _ _ = E.throwError (Raw.ASN1ParsingFail "boundary not a header")
+		p _ _ _ = E.throwError (Event.ASN1ParsingFail "boundary not a header")
 
-{- | enumeratee from 'Raw.ASN1Event to 'ASN1'
+{- | enumeratee from 'Event.ASN1Event to 'ASN1'
  -
  - it's the enumerator equivalent:
  - @enumReadRaw = map fst . enumReadRawRepr@
  -}
-enumReadRaw :: Monad m => Enumeratee Raw.ASN1Event ASN1 m a
+enumReadRaw :: Monad m => Enumeratee Event.ASN1Event ASN1 m a
 enumReadRaw = \f -> E.joinI (enumReadRawRepr $$ (E.map fst f))
 
 {- | enumWriteRaw is an enumeratee from asn1 to raw events -}
-enumWriteRaw :: Monad m => Enumeratee ASN1 Raw.ASN1Event m a
+enumWriteRaw :: Monad m => Enumeratee ASN1 Event.ASN1Event m a
 enumWriteRaw = \f -> E.joinI (enumWriteTree $$ (enumWriteTreeRaw f))
 
 enumWriteTree :: Monad m => Enumeratee ASN1 (ASN1, [ASN1]) m a
@@ -152,7 +152,7 @@ enumWriteTree = do
 			isEnd _           = False
 
 
-enumWriteTreeRaw :: Monad m => Enumeratee (ASN1, [ASN1]) Raw.ASN1Event m a
+enumWriteTreeRaw :: Monad m => Enumeratee (ASN1, [ASN1]) Event.ASN1Event m a
 enumWriteTreeRaw = E.concatMap writeTree
 	where writeTree (p,children) = snd $ case p of
 		Start _ -> encodeConstructed p children
@@ -161,17 +161,17 @@ enumWriteTreeRaw = E.concatMap writeTree
 {-| enumReadBytes is an enumeratee converting from bytestring to ASN1
   it transforms chunks of bytestring into chunks of ASN1 objects -}
 enumReadBytes :: Monad m => Enumeratee ByteString ASN1 m a
-enumReadBytes = \f -> E.joinI (Raw.enumReadBytes $$ (enumReadRaw f))
+enumReadBytes = \f -> E.joinI (Event.enumReadBytes $$ (enumReadRaw f))
 
 {-| enumReadBytes is an enumeratee converting from bytestring to ASN1
   it transforms chunks of bytestring into chunks of ASN1 objects -}
 enumReadBytesRepr :: Monad m => Enumeratee ByteString ASN1Repr m a
-enumReadBytesRepr = \f -> E.joinI (Raw.enumReadBytes $$ (enumReadRawRepr f))
+enumReadBytesRepr = \f -> E.joinI (Event.enumReadBytes $$ (enumReadRawRepr f))
 
 {-| enumWriteBytes is an enumeratee converting from ASN1 to bytestring.
   it transforms chunks of ASN1 objects into chunks of bytestring  -}
 enumWriteBytes :: Monad m => Enumeratee ASN1 ByteString m a
-enumWriteBytes = \f -> E.joinI (enumWriteRaw $$ (Raw.enumWriteBytes f))
+enumWriteBytes = \f -> E.joinI (enumWriteRaw $$ (Event.enumWriteBytes f))
 
 {-| iterate over a file using a file enumerator. -}
 iterateFile :: FilePath -> Iteratee ASN1 IO a -> IO (Either SomeException a)
@@ -186,11 +186,11 @@ iterateByteStringRepr :: Monad m => L.ByteString -> Iteratee ASN1Repr m a -> m (
 iterateByteStringRepr bs p = E.run (E.enumList 1 (L.toChunks bs) $$ E.joinI $ enumReadBytesRepr $$ p)
 
 {-| iterate over asn1 events using a list enumerator over each chunks -}
-iterateEvents :: Monad m => [Raw.ASN1Event] -> Iteratee ASN1 m a -> m (Either SomeException a)
+iterateEvents :: Monad m => [Event.ASN1Event] -> Iteratee ASN1 m a -> m (Either SomeException a)
 iterateEvents evs p = E.run (E.enumList 8 evs $$ E.joinI $ enumReadRaw $$ p)
 
 {-| iterate over asn1 events using a list enumerator over each chunks -}
-iterateEventsRepr :: Monad m => [Raw.ASN1Event] -> Iteratee ASN1Repr m a -> m (Either SomeException a)
+iterateEventsRepr :: Monad m => [Event.ASN1Event] -> Iteratee ASN1Repr m a -> m (Either SomeException a)
 iterateEventsRepr evs p = E.run (E.enumList 8 evs $$ E.joinI $ enumReadRawRepr $$ p)
 
 {- helper to transform a Someexception from the enumerator to an ASN1Err if possible -}
@@ -199,11 +199,11 @@ wrapASN1Err (Left err) = Left (maybe (ASN1ParsingFail "unknown") id $ fromExcept
 wrapASN1Err (Right x)  = Right x
 
 {-| decode a list of raw ASN1Events into a stream of ASN1 types -}
-decodeASN1Events :: [Raw.ASN1Event] -> Either ASN1Err [ASN1]
+decodeASN1Events :: [Event.ASN1Event] -> Either ASN1Err [ASN1]
 decodeASN1Events evs = wrapASN1Err $ runIdentity (iterateEvents evs EL.consume)
 
 {-| decode a list of raw ASN1Events into a stream of ASN1Repr types -}
-decodeASN1EventsRepr :: [Raw.ASN1Event] -> Either ASN1Err [ASN1Repr]
+decodeASN1EventsRepr :: [Event.ASN1Event] -> Either ASN1Err [ASN1Repr]
 decodeASN1EventsRepr evs = wrapASN1Err $ runIdentity (iterateEventsRepr evs EL.consume)
 
 {-| decode a lazy bytestring as an ASN1 stream -}
@@ -215,7 +215,7 @@ decodeASN1StreamRepr :: L.ByteString -> Either ASN1Err [ASN1Repr]
 decodeASN1StreamRepr l = wrapASN1Err $ runIdentity (iterateByteStringRepr l EL.consume)
 
 {-| encode an ASN1 Stream as raw ASN1 Events -}
-encodeASN1Events :: [ASN1] -> Either ASN1Err [Raw.ASN1Event]
+encodeASN1Events :: [ASN1] -> Either ASN1Err [Event.ASN1Event]
 encodeASN1Events o = wrapASN1Err $ runIdentity run
 	where run = E.run (E.enumList 8 o $$ E.joinI $ enumWriteRaw $$ EL.consume)
 

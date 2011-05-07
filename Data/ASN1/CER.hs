@@ -18,7 +18,7 @@ module Data.ASN1.CER
 	, encodeASN1
 	) where
 
-import Data.ASN1.Raw
+import Data.ASN1.Event
 import Data.ASN1.Prim
 import Data.ASN1.Types (ASN1t)
 import qualified Data.ASN1.BER as BER

@@ -7,7 +7,7 @@ module Data.ASN1.Types
 import qualified Data.ASN1.Stream as S
 import qualified Data.ByteString.Lazy as L
 import Data.ByteString (ByteString)
-import Data.ASN1.Raw (ASN1Class, ASN1Tag)
+import Data.ASN1.Event (ASN1Class, ASN1Tag)
 
 data ASN1t =
 	  Boolean Bool

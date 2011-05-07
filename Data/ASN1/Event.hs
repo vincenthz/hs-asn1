@@ -1,15 +1,17 @@
 {-# LANGUAGE BangPatterns, DeriveDataTypeable #-}
 -- |
--- Module      : Data.ASN1.Raw
+-- Module      : Data.ASN1.Event
 -- License     : BSD-style
 -- Maintainer  : Vincent Hanquez <vincent@snarc.org>
 -- Stability   : experimental
 -- Portability : unknown
 --
--- A module containing raw ASN1 serialization/derialization tools
+-- ASN1 Events describe the low level un-interpreted
+-- structure of an ASN1 document. it's a direct
+-- representation of the raw bytes, and is encoding agnostic.
 --
 
-module Data.ASN1.Raw
+module Data.ASN1.Event
 	(
 	-- * ASN1 definitions
 	  ASN1Class(..)
@@ -24,6 +26,7 @@ module Data.ASN1.Raw
 	, enumReadBytes
 	, enumWriteBytes
 	, toBytes
+	, fromBytes
 	-- * serialize asn1 headers
 	, getHeader
 	, putHeader
@@ -259,6 +262,10 @@ enumWriteBytes = checkDone $ \k -> k (Chunks []) >>== loop []
 				[]         -> E.throwError ASN1WritingUnexpectedConstructionEnd
 				True : tl  -> k (Chunks [putEoc]) >>== loop tl
 				False : tl -> k (Chunks []) >>== loop tl
+
+fromBytes :: L.ByteString -> Either ASN1Err [ASN1Event]
+fromBytes lbs = either (Left . mapErr) Right $ runIdentity $ iterateByteString lbs EL.consume
+	where mapErr err = maybe (ASN1Misc "cannot convert exception") id $ fromException err
 
 toBytes :: [ASN1Event] -> L.ByteString
 toBytes evs = case runIdentity (run (enumList 8 evs $$ joinI (enumWriteBytes $$ EL.consume))) of

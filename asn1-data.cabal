@@ -1,5 +1,5 @@
 Name:                asn1-data
-Version:             0.5.0
+Version:             0.6.0
 Description:
     ASN1 data reader and writer in raw form with supports for high level forms of ASN1 (BER, CER and DER).
     .
@@ -33,7 +33,7 @@ Library
   Exposed-modules:   Data.ASN1.BER
                      Data.ASN1.CER
                      Data.ASN1.DER
-                     Data.ASN1.Raw
+                     Data.ASN1.Event
                      Data.ASN1.Types
                      Data.ASN1.Stream
   other-modules:     Data.ASN1.Prim

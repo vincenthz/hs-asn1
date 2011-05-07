@@ -55,7 +55,7 @@ module Data.ASN1.Prim
 	) where
 
 import Data.ASN1.Internal
-import Data.ASN1.Raw
+import Data.ASN1.Event
 import Data.ASN1.Stream
 import Data.Bits
 import Data.Word

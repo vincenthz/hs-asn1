@@ -4,7 +4,7 @@ import Test.Framework.Providers.QuickCheck2(testProperty)
 
 import Text.Printf
 
-import Data.ASN1.Raw
+import Data.ASN1.Event
 import Data.ASN1.Stream (ASN1(..), ASN1ConstructionType(..))
 import Data.ASN1.Prim
 import qualified Data.ASN1.Types as T (ASN1t(..))
