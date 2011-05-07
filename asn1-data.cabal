@@ -23,13 +23,13 @@ Flag test
   Default:           False
 
 Library
-  Build-Depends:     base >= 3 && < 5,
-                     bytestring,
-                     text >= 0.11,
-                     enumerator >= 0.4.5 && < 0.5,
-                     attoparsec >= 0.8 && < 0.9,
-                     attoparsec-enumerator >= 0.2 && < 0.3,
-                     mtl
+  Build-Depends:     base >= 3 && < 5
+                   , bytestring
+                   , text >= 0.11
+                   , enumerator >= 0.4.5 && < 0.5
+                   , attoparsec >= 0.8 && < 0.9
+                   , attoparsec-enumerator >= 0.2 && < 0.3
+                   , mtl
   Exposed-modules:   Data.ASN1.BER
                      Data.ASN1.CER
                      Data.ASN1.DER
@@ -44,8 +44,12 @@ Executable           Tests
   Main-Is:           Tests.hs
   if flag(test)
     Buildable:       True
-    Build-depends:   base >= 3 && < 7, HUnit, QuickCheck >= 2, bytestring
-                    ,test-framework>=0.3,test-framework-quickcheck2>=0.2
+    Build-depends:   base >= 3 && < 7
+                   , HUnit
+                   , QuickCheck >= 2
+                   , bytestring
+                   , test-framework >= 0.3
+                   , test-framework-quickcheck2 >= 0.2
   else
     Buildable:       False
 
