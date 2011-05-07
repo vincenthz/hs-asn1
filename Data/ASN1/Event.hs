@@ -263,11 +263,12 @@ enumWriteBytes = checkDone $ \k -> k (Chunks []) >>== loop []
 				True : tl  -> k (Chunks [putEoc]) >>== loop tl
 				False : tl -> k (Chunks []) >>== loop tl
 
+-- | convert a lazy bytestring into a list of ASN1 events on success or an ASN1Err.
 fromBytes :: L.ByteString -> Either ASN1Err [ASN1Event]
 fromBytes lbs = either (Left . mapErr) Right $ runIdentity $ iterateByteString lbs EL.consume
 	where mapErr err = maybe (ASN1Misc "cannot convert exception") id $ fromException err
 
+-- | convert a list of events into a lazy bytestring
 toBytes :: [ASN1Event] -> L.ByteString
-toBytes evs = case runIdentity (run (enumList 8 evs $$ joinI (enumWriteBytes $$ EL.consume))) of
-	Left err -> error $ show err
-	Right l  -> L.fromChunks l
+toBytes evs = either (error . show) (L.fromChunks) $ runIdentity runEnumerator
+	where runEnumerator = run (enumList 8 evs $$ joinI (enumWriteBytes $$ EL.consume))
