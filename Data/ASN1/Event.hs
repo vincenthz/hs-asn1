@@ -48,6 +48,7 @@ import Data.Typeable
 import Data.Word
 import Data.Bits
 import Control.Monad
+import Control.Monad.Error
 import Control.Monad.Identity
 import Control.Applicative ((<|>), (<$>))
 
@@ -89,6 +90,8 @@ data ASN1Err =
 	deriving (Typeable, Show, Eq)
 
 instance Exception ASN1Err
+
+instance Error ASN1Err
 
 {-| iterate over a file using a file enumerator. -}
 iterateFile :: FilePath -> Iteratee ASN1Event IO a -> IO (Either SomeException a)

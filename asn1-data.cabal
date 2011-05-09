@@ -30,12 +30,8 @@ Library
                    , attoparsec >= 0.8 && < 0.9
                    , attoparsec-enumerator >= 0.2 && < 0.3
                    , mtl
-  Exposed-modules:   Data.ASN1.BER
-                     Data.ASN1.CER
-                     Data.ASN1.DER
-                     Data.ASN1.Event
-                     Data.ASN1.Types
-                     Data.ASN1.Stream
+  Exposed-modules:   Data.ASN1.Representation
+                   , Data.ASN1.Event
   other-modules:     Data.ASN1.Prim
                      Data.ASN1.Internal
   ghc-options:       -Wall
