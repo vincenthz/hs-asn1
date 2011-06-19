@@ -18,10 +18,13 @@ module Data.ASN1.Representation
 	-- * serialization from and to events 
 	, decodeASN1WithEvents
 	, decodeASN1
+	, decodeFromBytes
 	, encodeASN1
+	, encodeToBytes
 	) where
 
 import qualified Data.ByteString as B
+import qualified Data.ByteString.Lazy as L
 import Data.ByteString (ByteString)
 import Data.ASN1.Event
 import Data.ASN1.Prim
@@ -148,6 +151,12 @@ decodeASN1WithEvents rules = decodeASN1Chunk rules primCB structCB
 			TypeSet           -> Set children evs
 			TypeContainer c t -> Container c t children evs
 
+-- | decode ASN1 bytes to ASN1tree
+decodeFromBytes :: ([ASN1Event] -> Either ASN1Err b)
+                -> L.ByteString
+                -> Either ASN1Err b
+decodeFromBytes dec lbs = fromBytes lbs >>= dec
+
 -- | decode ASN1Events into a list of ASN1Tree.
 -- the decoding is parametrized by the rules
 decodeASN1 :: ASN1Rules -> [ASN1Event] -> Either ASN1Err [ASN1Tree ()]
@@ -163,6 +172,10 @@ decodeASN1 rules = decodeASN1Chunk rules primCB structCB
 -- the encoding is parametrized by the rules
 encodeASN1 :: ASN1Rules -> [ASN1Tree a] -> [ASN1Event]
 encodeASN1 rules trees = concatMap (snd . encodeTree rules) trees
+
+-- | encode ASN1Tree to bytes using the enc function to generate events
+encodeToBytes :: ([ASN1Tree a] -> [ASN1Event]) -> [ASN1Tree a] -> L.ByteString
+encodeToBytes enc trees = toBytes $ enc trees
 
 decodePrimitive :: ASN1Header -> ByteString -> Either ASN1Err ASN1Element
 decodePrimitive (ASN1Header Universal 0x1 _ _) p   = Boolean <$> getBoolean False p
