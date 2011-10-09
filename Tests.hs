@@ -5,6 +5,7 @@ import Test.Framework.Providers.QuickCheck2(testProperty)
 import Text.Printf
 
 import Data.ASN1.Raw
+import Data.ASN1.BitArray
 import Data.ASN1.Stream (ASN1(..), ASN1ConstructionType(..))
 import Data.ASN1.Prim
 import qualified Data.ASN1.Types as T (ASN1t(..))
@@ -98,6 +99,12 @@ instance Arbitrary T.Text where
 		ws <- replicateM len arbitrary
 		return $ T.pack ws
 
+instance Arbitrary BitArray where
+	arbitrary = do
+		bs <- arbitrary
+		--w  <- choose (0,7) :: Gen Int
+		return $ toBitArray bs 0
+
 arbitraryTime = do
 	y <- choose (1951, 2050)
 	m <- choose (0, 11)
@@ -127,7 +134,7 @@ instance Arbitrary ASN1 where
 	arbitrary = oneof
 		[ liftM Boolean arbitrary
 		, liftM IntVal arbitrary
-		, liftM2 BitString (choose (0,7)) arbitrary
+		, liftM BitString arbitrary
 		, liftM OctetString arbitrary
 		, return Null
 		, liftM OID arbitraryOID
@@ -169,7 +176,7 @@ instance Arbitrary T.ASN1t where
 	arbitrary = oneof
 		[ liftM T.Boolean arbitrary
 		, liftM T.IntVal arbitrary
-		, liftM2 T.BitString (choose (0,7)) arbitrary
+		, liftM T.BitString arbitrary
 		, liftM T.OctetString arbitrary
 		, return T.Null
 		, liftM T.OID arbitraryOID

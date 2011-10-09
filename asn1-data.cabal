@@ -34,6 +34,7 @@ Library
                      Data.ASN1.CER
                      Data.ASN1.DER
                      Data.ASN1.Raw
+                     Data.ASN1.BitArray
                      Data.ASN1.Types
                      Data.ASN1.Stream
   other-modules:     Data.ASN1.Prim

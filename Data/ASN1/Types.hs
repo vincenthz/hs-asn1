@@ -4,6 +4,7 @@ module Data.ASN1.Types
 	, toStream
 	) where
 
+import Data.ASN1.BitArray
 import qualified Data.ASN1.Stream as S
 import qualified Data.ByteString.Lazy as L
 import Data.ByteString (ByteString)
@@ -12,7 +13,7 @@ import Data.ASN1.Raw (ASN1Class, ASN1Tag)
 data ASN1t =
 	  Boolean Bool
 	| IntVal Integer
-	| BitString Int L.ByteString
+	| BitString BitArray
 	| OctetString L.ByteString
 	| Null
 	| OID [Integer]
@@ -52,7 +53,7 @@ ofStream (S.Start ty : l)          =
 
 ofStream (S.Boolean b : l)         = Boolean b : ofStream l
 ofStream (S.IntVal i : l)          = IntVal i : ofStream l
-ofStream (S.BitString i bits : l)  = BitString i bits : ofStream l
+ofStream (S.BitString bits : l)    = BitString bits : ofStream l
 ofStream (S.OctetString b : l)     = OctetString b : ofStream l
 ofStream (S.Null : l)              = Null : ofStream l
 ofStream (S.OID oid : l)           = OID oid : ofStream l
@@ -82,7 +83,7 @@ toStream l = concatMap toStreamOne l
 		toStreamOne (Container tc tag s)  = ([S.Start (S.Container tc tag)] ++ toStream s ++ [S.End (S.Container tc tag)])
 		toStreamOne (Boolean b)         = [S.Boolean b]
 		toStreamOne (IntVal b)          = [S.IntVal b]
-		toStreamOne (BitString i b)     = [S.BitString i b]
+		toStreamOne (BitString b)       = [S.BitString b]
 		toStreamOne (OctetString b)     = [S.OctetString b]
 		toStreamOne (Null)              = [S.Null]
 		toStreamOne (OID b)             = [S.OID b]

@@ -57,6 +57,7 @@ module Data.ASN1.Prim
 import Data.ASN1.Internal
 import Data.ASN1.Raw
 import Data.ASN1.Stream
+import Data.ASN1.BitArray
 import Data.Bits
 import Data.Word
 import Data.List (unfoldr)
@@ -87,7 +88,7 @@ decodeUCS2BE l = T.pack $ loop l
 encodeHeader :: Bool -> ASN1Length -> ASN1 -> ASN1Header
 encodeHeader pc len (Boolean _)                = ASN1Header Universal 0x1 pc len
 encodeHeader pc len (IntVal _)                 = ASN1Header Universal 0x2 pc len
-encodeHeader pc len (BitString _ _)            = ASN1Header Universal 0x3 pc len
+encodeHeader pc len (BitString _)              = ASN1Header Universal 0x3 pc len
 encodeHeader pc len (OctetString _)            = ASN1Header Universal 0x4 pc len
 encodeHeader pc len Null                       = ASN1Header Universal 0x5 pc len
 encodeHeader pc len (OID _)                    = ASN1Header Universal 0x6 pc len
@@ -119,7 +120,7 @@ encodePrimitiveHeader = encodeHeader False
 encodePrimitiveData :: ASN1 -> ByteString
 encodePrimitiveData (Boolean b)         = B.singleton (if b then 0xff else 0)
 encodePrimitiveData (IntVal i)          = putInteger i
-encodePrimitiveData (BitString i bits)  = putBitString i bits
+encodePrimitiveData (BitString bits)    = putBitString bits
 encodePrimitiveData (OctetString b)     = putString b
 encodePrimitiveData Null                = B.empty
 encodePrimitiveData (OID oid)           = putOID oid
@@ -253,7 +254,7 @@ getBitString s =
 	let toSkip' = if toSkip >= 48 && toSkip <= 48 + 7 then toSkip - (fromIntegral $ ord '0') else toSkip in
 	let xs = B.tail s in
 	if toSkip' >= 0 && toSkip' <= 7
-		then Right $ BitString (fromIntegral toSkip') (L.fromChunks [xs])
+		then Right $ BitString $ toBitArray (L.fromChunks [xs]) (fromIntegral toSkip')
 		else Left $ ASN1Misc ("bitstring: skip number not within bound " ++ show toSkip' ++ " " ++  show s)
 
 getString :: (ByteString -> Maybe ASN1Err) -> ByteString -> Either ASN1Err L.ByteString
@@ -378,8 +379,10 @@ putGeneralizedTime time = putTime True time
 putInteger :: Integer -> ByteString
 putInteger i = B.pack $ bytesOfInt i
 
-putBitString :: Int -> L.ByteString -> ByteString
-putBitString i bits = B.concat $ B.singleton (fromIntegral i) : L.toChunks bits
+putBitString :: BitArray -> ByteString
+putBitString (BitArray n bits) =
+	B.concat $ B.singleton (fromIntegral i) : L.toChunks bits
+	where i = (8 - (n `mod` 8)) .&. 0x7
 
 putString :: L.ByteString -> ByteString
 putString l = B.concat $ L.toChunks l

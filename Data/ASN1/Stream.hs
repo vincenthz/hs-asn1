@@ -7,6 +7,7 @@ module Data.ASN1.Stream
 	) where
 
 import Data.ASN1.Raw
+import Data.ASN1.BitArray
 import Data.ByteString (ByteString)
 import qualified Data.ByteString.Lazy as L
 
@@ -19,7 +20,7 @@ data ASN1ConstructionType =
 data ASN1 =
 	  Boolean Bool
 	| IntVal Integer
-	| BitString Int L.ByteString
+	| BitString BitArray
 	| OctetString L.ByteString
 	| Null
 	| OID [Integer]
