@@ -74,15 +74,18 @@ encodeUCS2BE t =
 	L.pack $ concatMap (\c -> let (d,m) = (fromEnum c) `divMod` 256 in [fromIntegral m,fromIntegral d] ) $ T.unpack t
 
 decodeUCS2BE :: L.ByteString -> Text
-decodeUCS2BE l = T.pack $ loop l
+decodeUCS2BE lbs = T.pack $ loop lbs
 	where
-		loop x
-			| L.null x  = []
+		loop bs
+			| L.null bs = []
 			| otherwise = 
-				let (h, r) = L.splitAt 2 l in
-				case L.unpack h of
-					[a,b] -> (toEnum $ (fromIntegral a) + (fromIntegral b) * 256) : loop r
-					_     -> loop r
+				let (h, r) = L.splitAt 2 bs in
+				case L.length h of
+					2 -> (toEnum $ fromIntegral $ be16 h) : loop r
+					_ -> loop r
+		be16 :: L.ByteString -> Word16
+		be16 b = fromIntegral (L.index b 0) `shiftL` 8
+		       + fromIntegral (L.index b 1)
 	
 
 encodeHeader :: Bool -> ASN1Length -> ASN1 -> ASN1Header
