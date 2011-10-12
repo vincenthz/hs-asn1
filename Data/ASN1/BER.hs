@@ -195,7 +195,7 @@ iterateEventsRepr evs p = E.run (E.enumList 8 evs $$ E.joinI $ enumReadRawRepr $
 
 {- helper to transform a Someexception from the enumerator to an ASN1Err if possible -}
 wrapASN1Err :: Either SomeException a -> Either ASN1Err a
-wrapASN1Err (Left err) = Left (maybe (ASN1ParsingFail "unknown") id $ fromException err)
+wrapASN1Err (Left err) = Left (maybe (ASN1ParsingFail $ show err) id $ fromException err)
 wrapASN1Err (Right x)  = Right x
 
 {-| decode a list of raw ASN1Events into a stream of ASN1 types -}
