@@ -1,5 +1,5 @@
 Name:                asn1-data
-Version:             0.6.0
+Version:             0.6.1
 Description:
     ASN1 data reader and writer in raw form with supports for high level forms of ASN1 (BER, CER and DER).
     .
