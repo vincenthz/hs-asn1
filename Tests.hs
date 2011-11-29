@@ -243,4 +243,4 @@ marshallingTests = testGroup "Marshalling"
 	, testProperty "DER" prop_asn1_der_marshalling_id
 	]
 
-main = do defaultMain [marshallingTests]
+main = defaultMain [marshallingTests]
