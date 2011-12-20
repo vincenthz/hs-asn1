@@ -151,6 +151,7 @@ instance Arbitrary ASN1 where
 		, liftM GraphicString arbitrary
 		, liftM VisibleString arbitrary
 		, liftM GeneralString arbitrary
+		, liftM BMPString arbitrary
 		, liftM UniversalString arbitrary
 		]
 
