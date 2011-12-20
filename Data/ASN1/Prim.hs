@@ -71,7 +71,7 @@ import Data.Text.Lazy.Encoding (decodeASCII, decodeUtf8, decodeUtf32BE, encodeUt
 
 encodeUCS2BE :: Text -> L.ByteString
 encodeUCS2BE t =
-	L.pack $ concatMap (\c -> let (d,m) = (fromEnum c) `divMod` 256 in [fromIntegral m,fromIntegral d] ) $ T.unpack t
+	L.pack $ concatMap (\c -> let (d,m) = (fromEnum c) `divMod` 256 in [fromIntegral d,fromIntegral m] ) $ T.unpack t
 
 decodeUCS2BE :: L.ByteString -> Text
 decodeUCS2BE lbs = T.pack $ loop lbs
