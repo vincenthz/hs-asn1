@@ -1,5 +1,7 @@
+{-# LANGUAGE DeriveDataTypeable #-}
 module Data.ASN1.BitArray
 	( BitArray(..)
+	, BitArrayOutOfBound(..)
 	, bitArrayLength
 	, bitArrayGetBit
 	, bitArrayGetData
@@ -9,6 +11,13 @@ module Data.ASN1.BitArray
 import Data.Bits
 import Data.Word
 import qualified Data.ByteString.Lazy as L
+import Data.Typeable
+import Control.Exception (Exception, throw)
+
+-- | throwed in case of out of bounds in the bitarray.
+data BitArrayOutOfBound = BitArrayOutOfBound Word64
+	deriving (Show,Eq,Typeable)
+instance Exception BitArrayOutOfBound
 
 -- | represent a bitarray / bitmap
 data BitArray = BitArray Word64 L.ByteString
@@ -18,10 +27,13 @@ data BitArray = BitArray Word64 L.ByteString
 bitArrayLength :: BitArray -> Word64
 bitArrayLength (BitArray l _) = l
 
+bitArrayOutOfBound :: Word64 -> a
+bitArrayOutOfBound n = throw $ BitArrayOutOfBound n
+
 -- | get the nth bits
 bitArrayGetBit :: BitArray -> Word64 -> Bool
 bitArrayGetBit (BitArray l d) n
-	| n >= l    = error ("array bit out of bounds: requesting bit " ++ show n ++ " but only got " ++ show l ++ " bits")
+	| n >= l    = bitArrayOutOfBound n
 	| otherwise = flip testBit (7-fromIntegral bitn) $ L.index d (fromIntegral offset)
 		where (offset, bitn) = n `divMod` 8
 
