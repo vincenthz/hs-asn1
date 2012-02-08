@@ -4,12 +4,16 @@ module Data.ASN1.BitArray
 	, BitArrayOutOfBound(..)
 	, bitArrayLength
 	, bitArrayGetBit
+	, bitArraySetBitValue
+	, bitArraySetBit
+	, bitArrayClearBit
 	, bitArrayGetData
 	, toBitArray
 	) where
 
 import Data.Bits
 import Data.Word
+import Data.Maybe
 import qualified Data.ByteString.Lazy as L
 import Data.Typeable
 import Control.Exception (Exception, throw)
@@ -36,6 +40,27 @@ bitArrayGetBit (BitArray l d) n
 	| n >= l    = bitArrayOutOfBound n
 	| otherwise = flip testBit (7-fromIntegral bitn) $ L.index d (fromIntegral offset)
 		where (offset, bitn) = n `divMod` 8
+
+-- | set the nth bit to the value specified
+bitArraySetBitValue :: BitArray -> Word64 -> Bool -> BitArray
+bitArraySetBitValue (BitArray l d) n v
+	| n >= l    = bitArrayOutOfBound n
+	| otherwise =
+		let (before,after) = L.splitAt (fromIntegral offset) d in
+		-- array bound check before prevent fromJust from failing.
+		let (w,remaining) = fromJust $ L.uncons after in
+		BitArray l (before `L.append` (setter w (fromIntegral bitn) `L.cons` remaining))
+		where
+			(offset, bitn) = n `divMod` 8
+			setter = if v then setBit else clearBit
+
+-- | set the nth bits
+bitArraySetBit :: BitArray -> Word64 -> BitArray
+bitArraySetBit bitarray n = bitArraySetBitValue bitarray n True
+
+-- | clear the nth bits
+bitArrayClearBit :: BitArray -> Word64 -> BitArray
+bitArrayClearBit bitarray n = bitArraySetBitValue bitarray n False
 
 -- | get padded bytestring of the bitarray
 bitArrayGetData :: BitArray -> L.ByteString
