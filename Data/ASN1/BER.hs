@@ -36,19 +36,12 @@ module Data.ASN1.BER
 	, decodeASN1Stream
 	, decodeASN1StreamRepr
 	, encodeASN1Stream
-
-	-- * BER serialize functions, deprecated
-	, decodeASN1
-	, decodeASN1s
-	, encodeASN1
-	, encodeASN1s
 	) where
 
 import Data.ASN1.Raw (ASN1Header(..), ASN1Class(..), ASN1Err(..))
 import qualified Data.ASN1.Raw as Raw
 
 import Data.ASN1.Stream
-import Data.ASN1.Types (ofStream, toStream, ASN1t)
 import Data.ASN1.Prim
 
 import Control.Monad.Identity
@@ -223,23 +216,3 @@ encodeASN1Events o = wrapASN1Err $ runIdentity run
 encodeASN1Stream :: [ASN1] -> Either ASN1Err L.ByteString
 encodeASN1Stream l = either Left (Right . L.fromChunks) $ wrapASN1Err $ runIdentity run
 	where run = E.run (E.enumList 1 l $$ E.joinI $ enumWriteBytes $$ EL.consume)
-
-{-# DEPRECATED decodeASN1s "use stream types with decodeASN1Stream" #-}
-decodeASN1s :: L.ByteString -> Either ASN1Err [ASN1t]
-decodeASN1s = either (Left) (Right . ofStream) . decodeASN1Stream
-
-{-# DEPRECATED decodeASN1 "use stream types with decodeASN1Stream" #-}
-decodeASN1 :: L.ByteString -> Either ASN1Err ASN1t
-decodeASN1 = either (Left) (Right . head . ofStream) . decodeASN1Stream
-
-{-# DEPRECATED encodeASN1s "use stream types with encodeASN1Stream" #-}
-encodeASN1s :: [ASN1t] -> L.ByteString
-encodeASN1s s = case encodeASN1Stream $ toStream s of
-	Left err -> error $ show err
-	Right x  -> x
-
-{-# DEPRECATED encodeASN1 "use stream types with encodeASN1Stream" #-}
-encodeASN1 :: ASN1t -> L.ByteString
-encodeASN1 s = case encodeASN1Stream $ toStream [s] of
-	Left err -> error $ show err
-	Right x  -> x
