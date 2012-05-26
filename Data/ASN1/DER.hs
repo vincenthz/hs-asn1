@@ -22,13 +22,6 @@ module Data.ASN1.DER
 	, enumReadBytesRepr
 	, enumWriteBytes
 
-	-- * iterate over common representation to an ASN1 stream
-	, iterateFile
-	, iterateByteString
-	, iterateByteStringRepr
-	, iterateEvents
-	, iterateEventsRepr
-
 	-- * DER serialize functions
 	, decodeASN1EventsRepr
 	, decodeASN1Events
@@ -67,14 +60,14 @@ import qualified Data.Enumerator.List as EL
 
 {- | Check if the length is the minimum possible and it's not indefinite -}
 checkLength :: ASN1Length -> Maybe ASN1Err
-checkLength LenIndefinite = Just $ ASN1PolicyFailed "DER" "indefinite length not allowed"
+checkLength LenIndefinite = Just $ PolicyFailed "DER" "indefinite length not allowed"
 checkLength (LenShort _)  = Nothing
 checkLength (LenLong n i)
-	| n == 1 && i < 0x80  = Just $ ASN1PolicyFailed "DER" "long length should be a short length"
+	| n == 1 && i < 0x80  = Just $ PolicyFailed "DER" "long length should be a short length"
 	| n == 1 && i >= 0x80 = Nothing
 	| otherwise           = if i >= 2^((n-1)*8) && i < 2^(n*8)
 		then Nothing
-		else Just $ ASN1PolicyFailed "DER" "long length is not shortest"
+		else Just $ PolicyFailed "DER" "long length is not shortest"
 
 checkRawDER :: Monad m => Enumeratee Raw.ASN1Event Raw.ASN1Event m a
 checkRawDER = E.checkDone $ \k -> k (E.Chunks []) >>== loop
@@ -115,26 +108,6 @@ enumReadBytesRepr = \f -> E.joinI (Raw.enumReadBytes $$ (enumReadRawRepr f))
 enumWriteBytes :: Monad m => Enumeratee ASN1 ByteString m a
 enumWriteBytes = \f -> E.joinI (enumWriteRaw $$ (Raw.enumWriteBytes f))
 
-{-| iterate over a file using a file enumerator. -}
-iterateFile :: FilePath -> Iteratee ASN1 IO a -> IO (Either SomeException a)
-iterateFile path p = E.run (enumFile path $$ E.joinI $ enumReadBytes $$ p)
-
-{-| iterate over a bytestring using a list enumerator over each chunks -}
-iterateByteString :: Monad m => L.ByteString -> Iteratee ASN1 m a -> m (Either SomeException a)
-iterateByteString bs p = E.run (E.enumList 1 (L.toChunks bs) $$ E.joinI $ enumReadBytes $$ p)
-
-{-| iterate over a bytestring using a list enumerator over each chunks -}
-iterateByteStringRepr :: Monad m => L.ByteString -> Iteratee ASN1Repr m a -> m (Either SomeException a)
-iterateByteStringRepr bs p = E.run (E.enumList 1 (L.toChunks bs) $$ E.joinI $ enumReadBytesRepr $$ p)
-
-{-| iterate over asn1 events using a list enumerator over each chunks -}
-iterateEvents :: Monad m => [Raw.ASN1Event] -> Iteratee ASN1 m a -> m (Either SomeException a)
-iterateEvents evs p = E.run (E.enumList 8 evs $$ E.joinI $ enumReadRaw $$ p)
-
-{-| iterate over asn1 events using a list enumerator over each chunks -}
-iterateEventsRepr :: Monad m => [Raw.ASN1Event] -> Iteratee ASN1Repr m a -> m (Either SomeException a)
-iterateEventsRepr evs p = E.run (E.enumList 8 evs $$ E.joinI $ enumReadRawRepr $$ p)
-
 {- helper to transform a Someexception from the enumerator to an ASN1Err if possible -}
 wrapASN1Err :: Either SomeException a -> Either ASN1Err a
 wrapASN1Err (Left err) = Left (maybe (ASN1ParsingFail $ show err) id $ fromException err)
@@ -165,23 +138,3 @@ encodeASN1Events o = wrapASN1Err $ runIdentity run
 encodeASN1Stream :: [ASN1] -> Either ASN1Err L.ByteString
 encodeASN1Stream l = either Left (Right . L.fromChunks) $ wrapASN1Err $ runIdentity run
 	where run = E.run (E.enumList 1 l $$ E.joinI $ enumWriteBytes $$ EL.consume)
-
-{-# DEPRECATED decodeASN1s "use stream types with decodeASN1Stream" #-}
-decodeASN1s :: L.ByteString -> Either ASN1Err [ASN1t]
-decodeASN1s = either (Left) (Right . ofStream) . decodeASN1Stream
-
-{-# DEPRECATED decodeASN1 "use stream types with decodeASN1Stream" #-}
-decodeASN1 :: L.ByteString -> Either ASN1Err ASN1t
-decodeASN1 = either (Left) (Right . head . ofStream) . decodeASN1Stream
-
-{-# DEPRECATED encodeASN1s "use stream types with encodeASN1Stream" #-}
-encodeASN1s :: [ASN1t] -> L.ByteString
-encodeASN1s s = case encodeASN1Stream $ toStream s of
-	Left err -> error $ show err
-	Right x  -> x
-
-{-# DEPRECATED encodeASN1 "use stream types with encodeASN1Stream" #-}
-encodeASN1 :: ASN1t -> L.ByteString
-encodeASN1 s = case encodeASN1Stream $ toStream [s] of
-	Left err -> error $ show err
-	Right x  -> x

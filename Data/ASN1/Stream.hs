@@ -6,8 +6,8 @@ module Data.ASN1.Stream
 	, getConstructedEndRepr
 	) where
 
-import Data.ASN1.Raw
 import Data.ASN1.BitArray
+import Data.ASN1.Types
 import Data.ByteString (ByteString)
 import qualified Data.ByteString.Lazy as L
 
