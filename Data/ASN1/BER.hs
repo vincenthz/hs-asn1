@@ -29,19 +29,12 @@ module Data.ASN1.BER
 	, decodeASN1Stream
 	, decodeASN1StreamRepr
 	, encodeASN1Stream
-
-	-- * BER serialize functions, deprecated
-	, decodeASN1
-	, decodeASN1s
-	, encodeASN1
-	, encodeASN1s
 	) where
 
 import Data.ASN1.Raw (ASN1Header(..), ASN1Class(..), ASN1Err(..))
 import qualified Data.ASN1.Raw as Raw
 
 import Data.ASN1.Stream
-import Data.ASN1.Types (ofStream, toStream, ASN1t)
 import Data.ASN1.Prim
 
 import Control.Monad.Identity

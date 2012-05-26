@@ -116,12 +116,6 @@ arbitraryTime = do
 	z <- arbitrary
 	return (y,m,d,h,mi,se,z)
 
-arbitraryListASN1 = choose (0, 20) >>= \len -> replicateM len (suchThat arbitrary (not . aList))
-	where
-		aList (T.Set _)      = True
-		aList (T.Sequence _) = True
-		aList _              = False
-
 arbitraryPrintString = do
 	let printableString = (['a'..'z'] ++ ['A'..'Z'] ++ ['0'..'9'] ++ " ()+,-./:=?")
 	x <- replicateM 21 (elements printableString)
@@ -219,8 +213,6 @@ marshallingTests = testGroup "Marshalling" []
 	, testProperty "Event"  prop_event_marshalling_id
 	, testProperty "Stream" prop_asn1_event_marshalling_id
 	, testProperty "Repr"  prop_asn1_event_repr_id
-	, testProperty "BER"  prop_asn1_ber_marshalling_id
-	, testProperty "DER" prop_asn1_der_marshalling_id
 	]
 -}
 

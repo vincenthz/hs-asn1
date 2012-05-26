@@ -31,11 +31,6 @@ module Data.ASN1.DER
 	, decodeASN1StreamRepr
 	, encodeASN1Stream
 
-	-- * DER serialize functions, deprecated
-	, decodeASN1
-	, decodeASN1s
-	, encodeASN1
-	, encodeASN1s
 	) where
 
 import Data.ASN1.Raw (ASN1Class(..), ASN1Length(..), ASN1Header(..), ASN1Event(..), ASN1Err(..))
@@ -43,7 +38,6 @@ import qualified Data.ASN1.Raw as Raw
 
 import Data.ASN1.Prim
 import Data.ASN1.Stream (ASN1Repr)
-import Data.ASN1.Types (ofStream, toStream, ASN1t)
 
 import qualified Data.ASN1.BER as BER
 
