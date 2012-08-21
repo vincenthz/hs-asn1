@@ -119,7 +119,7 @@ runParseState = loop
                      Done p nPos remBytes -> Right (([Primitive p], ParseState stackEnd (ExpectHeader Nothing) nPos), remBytes)
 
            runGetHeader Nothing  = \pos -> runGetPos pos getHeader
-	   runGetHeader (Just f) = const f
+           runGetHeader (Just f) = const f
 
            runGetPrimitive Nothing  n = \pos -> runGetPos pos (getBytes $ fromIntegral n)
            runGetPrimitive (Just f) _ = const f

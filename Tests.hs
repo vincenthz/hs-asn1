@@ -5,10 +5,14 @@ import Test.Framework.Providers.QuickCheck2(testProperty)
 import Text.Printf
 
 --import Data.ASN1.Raw
+import Data.Serialize.Put (runPut)
+import Data.ASN1.Get (runGet, Result(..))
 import Data.ASN1.BitArray
 import Data.ASN1.Stream (ASN1(..), ASN1ConstructionType(..))
 import Data.ASN1.Prim
+import Data.ASN1.Serialize
 import Data.ASN1.Parse
+import Data.ASN1.Types
 --import qualified Data.ASN1.Types as T (ASN1t(..))
 --import qualified Data.ASN1.DER as DER
 --import qualified Data.ASN1.BER as BER
@@ -25,10 +29,8 @@ import Control.Monad
 import Control.Monad.Identity
 import System.IO
 
-{-
 instance Arbitrary ASN1Class where
 	arbitrary = elements [ Universal, Application, Context, Private ]
-
 
 instance Arbitrary ASN1Length where
 	arbitrary = do
@@ -51,6 +53,7 @@ arbitraryTag = choose(0,10000)
 instance Arbitrary ASN1Header where
 	arbitrary = liftM4 ASN1Header arbitrary arbitraryTag arbitrary arbitrary
 
+{-
 arbitraryEvents :: Gen ASN1Events
 arbitraryEvents = do
 	hdr@(ASN1Header _ _ _ len) <- liftM4 ASN1Header arbitrary arbitraryTag (return False) arbitraryDefiniteLength
@@ -169,10 +172,12 @@ instance Arbitrary ASN1s where
 				return ([Start str] ++ l ++ [End str])
 -}
 
-{-
 prop_header_marshalling_id :: ASN1Header -> Bool
-prop_header_marshalling_id v = (getHeader . putHeader) v == Right v
+prop_header_marshalling_id v = (ofDone $ runGet getHeader $ runPut (putHeader v)) == Right v
+    where ofDone (Done r _ _) = Right r
+          ofDone _            = Left "not done"
 
+{-
 prop_event_marshalling_id :: ASN1Events -> Bool
 prop_event_marshalling_id (ASN1Events e) =
 	let r = runIdentity $ E.run (E.enumList 1 e $$ E.joinI $ enumWriteReadBytes $$ EL.consume) in
@@ -207,9 +212,10 @@ prop_asn1_der_marshalling_id v = (DER.decodeASN1 . DER.encodeASN1) v == Right v
 
 
 -}
-marshallingTests = testGroup "Marshalling" []
-{-
+marshallingTests = testGroup "Marshalling"
 	[ testProperty "Header" prop_header_marshalling_id
+    ]
+{-
 	, testProperty "Event"  prop_event_marshalling_id
 	, testProperty "Stream" prop_asn1_event_marshalling_id
 	, testProperty "Repr"  prop_asn1_event_repr_id

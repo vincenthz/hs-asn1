@@ -33,7 +33,6 @@ import Data.Maybe (fromMaybe)
 import Foreign
 
 import qualified Data.ByteString          as B
---import qualified Data.ByteString.Internal as B
 import qualified Data.ByteString.Unsafe   as B
 
 -- | The result of a parse.

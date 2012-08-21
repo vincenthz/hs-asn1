@@ -35,6 +35,7 @@ Library
                      Data.ASN1.Types
   other-modules:     Data.ASN1.Prim
                      Data.ASN1.Parse
+                     Data.ASN1.Writer
                      Data.ASN1.Internal
                      Data.ASN1.Serialize
                      Data.ASN1.Get
