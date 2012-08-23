@@ -36,7 +36,7 @@ import Data.Maybe (fromJust)
 type ConstructionEndAt = Maybe Word64
 
 data ParseExpect = ExpectHeader (Maybe (B.ByteString -> Result ASN1Header))
-                | ExpectPrimitive Word64 (Maybe (B.ByteString -> Result ByteString))
+                 | ExpectPrimitive Word64 (Maybe (B.ByteString -> Result ByteString))
 
 -- | represent the parsing state of an ASN1 stream.
 data ParseState = ParseState
@@ -109,9 +109,13 @@ runParseState = loop
                                        (ASN1Header _ _ False LenIndefinite) -> Left StreamInfinitePrimitive
                                        (ASN1Header _ _ False len) ->
                                            let pLength = fromJust $ asn1LengthToConst len
-                                           in Right ( ( [Header hdr]
-                                                      , ParseState stackEnd (ExpectPrimitive pLength Nothing) nPos)
-                                                    , remBytes)
+                                           in if pLength == 0
+                                                 then Right ( ( [Header hdr,Primitive B.empty]
+                                                              , ParseState stackEnd (ExpectHeader Nothing) nPos)
+                                                            , remBytes)
+                                                 else Right ( ( [Header hdr]
+                                                              , ParseState stackEnd (ExpectPrimitive pLength Nothing) nPos)
+                                                            , remBytes)
            go (ParseState stackEnd (ExpectPrimitive len cont) pos) bs =
                 case runGetPrimitive cont len pos bs of
                      Fail _               -> error "primitive parsing failed"
