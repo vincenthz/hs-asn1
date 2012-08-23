@@ -1,28 +1,27 @@
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE BangPatterns #-}
 module Data.ASN1.Types
-	(
-	-- * Raw types
-	  ASN1Class(..)
-	, ASN1Tag
-	, ASN1Length(..)
-	, ASN1Header(..)
-	-- * Errors types
-	, ASN1Error(..)
-	-- * Events types
-	, ASN1Event(..)
-	) where
+    (
+    -- * Raw types
+      ASN1Class(..)
+    , ASN1Tag
+    , ASN1Length(..)
+    , ASN1Header(..)
+    -- * Errors types
+    , ASN1Error(..)
+    -- * Events types
+    , ASN1Event(..)
+    ) where
 
 import Control.Exception (Exception)
 import Data.Typeable
 import Data.ByteString (ByteString)
 
-data ASN1Class =
-	  Universal
-	| Application
-	| Context
-	| Private
-	deriving (Show,Eq,Ord,Enum)
+data ASN1Class = Universal
+               | Application
+               | Context
+               | Private
+               deriving (Show,Eq,Ord,Enum)
 
 type ASN1Tag = Int
 
@@ -33,7 +32,7 @@ data ASN1Length = LenShort Int      -- ^ Short form with only one byte. length h
 
 -- | ASN1 Header with the class, tag, constructed flag and length.
 data ASN1Header = ASN1Header !ASN1Class !ASN1Tag !Bool !ASN1Length
-	deriving (Show,Eq)
+    deriving (Show,Eq)
 
 -- | represent one event from an asn1 data stream
 data ASN1Event = Header ASN1Header     -- ^ ASN1 Header
@@ -45,6 +44,7 @@ data ASN1Event = Header ASN1Header     -- ^ ASN1 Header
 data ASN1Error = StreamUnexpectedEOC         -- ^ Unexpected EOC in the stream.
                | StreamInfinitePrimitive     -- ^ Invalid primitive with infinite length in a stream.
                | StreamConstructionWrongSize -- ^ A construction goes over the size specified in the header.
+               | StreamUnexpectedSituation String -- ^ An unexpected situation has come up parsing an ASN1 event stream.
                | ParsingHeaderFail String    -- ^ Parsing an invalid header.
                | ParsingPartial              -- ^ Parsing is not finished, there is construction unended.
                | TypeNotImplemented String   -- ^ Decoding of a type that is not implemented. Contribution welcome.
