@@ -1,5 +1,7 @@
 module Data.ASN1.Stream
     ( ASN1(..)
+    , ASN1Class(..)
+    , ASN1Tag
     , ASN1Repr
     , ASN1ConstructionType(..)
     , getConstructedEnd

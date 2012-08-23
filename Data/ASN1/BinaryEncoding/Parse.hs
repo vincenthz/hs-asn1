@@ -1,5 +1,5 @@
 -- |
--- Module      : Data.ASN1.Parse
+-- Module      : Data.ASN1.BinaryEncoding.Parse
 -- License     : BSD-style
 -- Maintainer  : Vincent Hanquez <vincent@snarc.org>
 -- Stability   : experimental
@@ -7,7 +7,7 @@
 --
 -- Generic parsing facility for ASN1.
 --
-module Data.ASN1.Parse
+module Data.ASN1.BinaryEncoding.Parse
     (
     -- * incremental parsing interfaces
       runParseState
@@ -21,10 +21,10 @@ module Data.ASN1.Parse
     ) where
 
 import Control.Arrow (first)
-import Data.ASN1.Types
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as L
+import Data.ASN1.Types
 import Data.ASN1.Get
 import Data.ASN1.Serialize
 import Data.Word
@@ -39,10 +39,7 @@ data ParseExpect = ExpectHeader (Maybe (B.ByteString -> Result ASN1Header))
                  | ExpectPrimitive Word64 (Maybe (B.ByteString -> Result ByteString))
 
 -- | represent the parsing state of an ASN1 stream.
-data ParseState = ParseState
-                           [ConstructionEndAt] -- ^ Stack of construction end positions.
-                           ParseExpect         -- ^ Next element expected state.
-                           Word64              -- ^ Current position.
+data ParseState = ParseState [ConstructionEndAt] ParseExpect Word64
 
 -- | create a new empty parse state. position is 0
 newParseState :: ParseState

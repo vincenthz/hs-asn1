@@ -1,5 +1,5 @@
 -- |
--- Module      : Data.ASN1.Writer
+-- Module      : Data.ASN1.BinaryEncoding.Writer
 -- License     : BSD-style
 -- Maintainer  : Vincent Hanquez <vincent@snarc.org>
 -- Stability   : experimental
@@ -7,7 +7,7 @@
 --
 -- Serialize events for streaming.
 --
-module Data.ASN1.Writer
+module Data.ASN1.BinaryEncoding.Writer
     ( toByteString
     , toLazyByteString
     ) where
