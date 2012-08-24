@@ -1,3 +1,10 @@
+-- |
+-- Module      : Data.ASN1.BitArray
+-- License     : BSD-style
+-- Maintainer  : Vincent Hanquez <vincent@snarc.org>
+-- Stability   : experimental
+-- Portability : unknown
+--
 {-# LANGUAGE DeriveDataTypeable #-}
 module Data.ASN1.BitArray
 	( BitArray(..)

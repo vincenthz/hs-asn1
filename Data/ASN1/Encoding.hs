@@ -1,3 +1,10 @@
+-- |
+-- Module      : Data.ASN1.Encoding
+-- License     : BSD-style
+-- Maintainer  : Vincent Hanquez <vincent@snarc.org>
+-- Stability   : experimental
+-- Portability : unknown
+--
 module Data.ASN1.Encoding
     (
     -- * generic class for decoding and encoding stream

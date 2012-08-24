@@ -1,3 +1,10 @@
+-- |
+-- Module      : Data.ASN1.Stream
+-- License     : BSD-style
+-- Maintainer  : Vincent Hanquez <vincent@snarc.org>
+-- Stability   : experimental
+-- Portability : unknown
+--
 module Data.ASN1.Stream
     ( ASN1(..)
     , ASN1Class(..)

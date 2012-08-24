@@ -1,3 +1,10 @@
+-- |
+-- Module      : Data.ASN1.Types
+-- License     : BSD-style
+-- Maintainer  : Vincent Hanquez <vincent@snarc.org>
+-- Stability   : experimental
+-- Portability : unknown
+--
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE BangPatterns #-}
 module Data.ASN1.Types
