@@ -19,9 +19,11 @@ import Data.ASN1.Types
 import Data.ASN1.Serialize
 import Data.Serialize.Put (runPut)
 
+-- | transform a list of ASN1 Events into a strict bytestring
 toByteString :: [ASN1Event] -> ByteString
 toByteString = B.concat . L.toChunks . toLazyByteString
 
+-- | transform a list of ASN1 Events into a lazy bytestring
 toLazyByteString :: [ASN1Event] -> L.ByteString
 toLazyByteString evs = L.fromChunks $ loop [] evs
     where loop _ [] = []

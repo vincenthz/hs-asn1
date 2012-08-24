@@ -17,7 +17,7 @@ import Data.Word
 import Control.Applicative ((<$>))
 import Control.Monad
 
-{- parseHeader parse a ASN1 header -}
+-- | parse an ASN1 header
 getHeader :: Get ASN1Header
 getHeader = do
 	(cl,pc,t1) <- parseFirstWord <$> getWord8
@@ -25,7 +25,7 @@ getHeader = do
 	len        <- getLength
 	return $ ASN1Header cl tag pc len
 
-{- parse the first word of an header -}
+-- | Parse the first word of an header
 parseFirstWord :: Word8 -> (ASN1Class, Bool, ASN1Tag)
 parseFirstWord w = (cl,pc,t1)
 	where
@@ -68,7 +68,7 @@ getLength = do
 		{- uintbs return the unsigned int represented by the bytes -}
 		uintbs = B.foldl (\acc n -> (acc `shiftL` 8) + fromIntegral n) 0
 
-{- | putIdentifier encode an ASN1 Identifier into a marshalled value -}
+-- | putIdentifier encode an ASN1 Identifier into a marshalled value
 putHeader :: ASN1Header -> Put
 putHeader (ASN1Header cl tag pc len) = do
     putWord8 word1

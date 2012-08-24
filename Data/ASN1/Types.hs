@@ -24,14 +24,17 @@ import Control.Exception (Exception)
 import Data.Typeable
 import Data.ByteString (ByteString)
 
+-- | Element class
 data ASN1Class = Universal
                | Application
                | Context
                | Private
                deriving (Show,Eq,Ord,Enum)
 
+-- | ASN1 Tag
 type ASN1Tag = Int
 
+-- | ASN1 Length with all different formats
 data ASN1Length = LenShort Int      -- ^ Short form with only one byte. length has to be < 127.
                 | LenLong Int Int   -- ^ Long form of N bytes
                 | LenIndefinite     -- ^ Length is indefinite expect an EOC in the stream to finish the type
@@ -48,6 +51,7 @@ data ASN1Event = Header ASN1Header     -- ^ ASN1 Header
                | ConstructionEnd       -- ^ Constructed value end
                deriving (Show,Eq)
 
+-- | Possible errors during parsing operations
 data ASN1Error = StreamUnexpectedEOC         -- ^ Unexpected EOC in the stream.
                | StreamInfinitePrimitive     -- ^ Invalid primitive with infinite length in a stream.
                | StreamConstructionWrongSize -- ^ A construction goes over the size specified in the header.
