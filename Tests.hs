@@ -45,7 +45,7 @@ arbitraryDefiniteLength :: Gen ASN1Length
 arbitraryDefiniteLength = arbitrary `suchThat` (\l -> l /= LenIndefinite)
 
 arbitraryTag :: Gen ASN1Tag
-arbitraryTag = choose(0,10000)
+arbitraryTag = choose(1,10000)
 
 instance Arbitrary ASN1Header where
         arbitrary = liftM4 ASN1Header arbitrary arbitraryTag arbitrary arbitrary
