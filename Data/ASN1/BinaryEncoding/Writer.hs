@@ -27,7 +27,7 @@ toByteString = B.concat . L.toChunks . toLazyByteString
 toLazyByteString :: [ASN1Event] -> L.ByteString
 toLazyByteString evs = L.fromChunks $ loop [] evs
     where loop _ [] = []
-          loop acc (x@(Header (ASN1Header _ _ pc len)):xs) = toBs x : loop (if pc && len == LenIndefinite then True:acc else acc) xs
+          loop acc (x@(Header (ASN1Header _ _ pc len)):xs) = toBs x : loop (if pc then (len == LenIndefinite):acc else acc) xs
           loop acc (ConstructionEnd:xs) = case acc of
                                               []        -> error "malformed stream: end before construction"
                                               (True:r)  -> toBs ConstructionEnd : loop r xs
