@@ -30,6 +30,7 @@ Library
   Exposed-modules:   Data.ASN1.BitArray
                      Data.ASN1.Types
                      Data.ASN1.BinaryEncoding
+                     Data.ASN1.BinaryEncoding.Raw
                      Data.ASN1.Encoding
                      Data.ASN1.Stream
                      Data.ASN1.Parse
