@@ -38,8 +38,10 @@ type ConstructionEndAt = Maybe Word64
 data ParseExpect = ExpectHeader (Maybe (B.ByteString -> Result ASN1Header))
                  | ExpectPrimitive Word64 (Maybe (B.ByteString -> Result ByteString))
 
+type ParsePosition = Word64
+
 -- | represent the parsing state of an ASN1 stream.
-data ParseState = ParseState [ConstructionEndAt] ParseExpect Word64
+data ParseState = ParseState [ConstructionEndAt] ParseExpect ParsePosition
 
 -- | create a new empty parse state. position is 0
 newParseState :: ParseState
