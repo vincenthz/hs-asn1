@@ -29,3 +29,4 @@ module Data.ASN1.BinaryEncoding.Raw
 import Data.ASN1.BinaryEncoding.Parse
 import Data.ASN1.BinaryEncoding.Writer
 import Data.ASN1.Types
+import Data.ASN1.Types.Lowlevel

@@ -18,6 +18,7 @@ module Data.ASN1.Parse
         , hasNext
         ) where
 
+import Data.ASN1.Types
 import Data.ASN1.Stream
 import Control.Monad.State
 import Control.Monad.Error

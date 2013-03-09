@@ -15,7 +15,7 @@ module Data.ASN1.BinaryEncoding.Writer
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as L
-import Data.ASN1.Types
+import Data.ASN1.Types.Lowlevel
 import Data.ASN1.Serialize
 import Data.Serialize.Put (runPut)
 

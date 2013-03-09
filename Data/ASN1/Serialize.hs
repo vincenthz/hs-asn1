@@ -12,6 +12,7 @@ import Data.Serialize.Put
 import Data.ASN1.Get
 import Data.ASN1.Internal
 import Data.ASN1.Types
+import Data.ASN1.Types.Lowlevel
 import Data.Bits
 import Data.Word
 import Control.Applicative ((<$>))
