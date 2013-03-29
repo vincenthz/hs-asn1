@@ -8,7 +8,6 @@
 module Data.ASN1.Serialize (getHeader, putHeader) where
 
 import qualified Data.ByteString as B
-import Data.Serialize.Put
 import Data.ASN1.Get
 import Data.ASN1.Internal
 import Data.ASN1.Types
@@ -70,15 +69,17 @@ getLength = do
 		uintbs = B.foldl (\acc n -> (acc `shiftL` 8) + fromIntegral n) 0
 
 -- | putIdentifier encode an ASN1 Identifier into a marshalled value
-putHeader :: ASN1Header -> Put
-putHeader (ASN1Header cl tag pc len) = do
-    putWord8 word1
-    unless (tag < 0x1f) $ putByteString $ putVarEncodingIntegral tag
-    putByteString $ B.pack $ putLength len
-        where cli   = shiftL (fromIntegral $ fromEnum cl) 6
-              pcval = shiftL (if pc then 0x1 else 0x0) 5
-              tag0  = if tag < 0x1f then fromIntegral tag else 0x1f
-              word1 = cli .|. pcval .|. tag0
+putHeader :: ASN1Header -> B.ByteString
+putHeader (ASN1Header cl tag pc len) = B.concat
+    [B.singleton word1
+    ,if tag < 0x1f then B.empty else tagBS
+    ,lenBS]
+  where cli   = shiftL (fromIntegral $ fromEnum cl) 6
+        pcval = shiftL (if pc then 0x1 else 0x0) 5
+        tag0  = if tag < 0x1f then fromIntegral tag else 0x1f
+        word1 = cli .|. pcval .|. tag0
+        lenBS = B.pack $ putLength len
+        tagBS = putVarEncodingIntegral tag
 
 {- | putLength encode a length into a ASN1 length.
  - see getLength for the encoding rules -}

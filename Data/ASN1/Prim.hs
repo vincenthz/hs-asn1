@@ -61,7 +61,6 @@ import Data.ASN1.Types
 import Data.ASN1.Types.Lowlevel
 import Data.ASN1.Error
 import Data.ASN1.Serialize
-import Data.Serialize.Put (runPut)
 import Data.Bits
 import Data.Word
 import Data.List (unfoldr)
@@ -125,7 +124,7 @@ encodePrimitive a =
 	let blen = B.length b in
 	let len = makeLength blen in
 	let hdr = encodePrimitiveHeader len a in
-	(B.length (runPut $ putHeader hdr) + blen, [Header hdr, Primitive b])
+	(B.length (putHeader hdr) + blen, [Header hdr, Primitive b])
 	where
 		makeLength len
 			| len < 0x80 = LenShort len
@@ -155,7 +154,7 @@ encodeConstructed c@(Start _) children =
 	let (clen, events) = encodeList children in
 	let len = mkSmallestLength clen in
 	let h = encodeHeader True len c in
-	let tlen = B.length (runPut $ putHeader h) + clen in
+	let tlen = B.length (putHeader h) + clen in
 	(tlen, Header h : ConstructionBegin : events ++ [ConstructionEnd])
 
 encodeConstructed _ _ = error "not a start node"

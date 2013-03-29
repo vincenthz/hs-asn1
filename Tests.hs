@@ -5,7 +5,6 @@ import Test.Framework.Providers.QuickCheck2(testProperty)
 import Text.Printf
 
 import Control.Applicative
-import Data.Serialize.Put (runPut)
 import Data.ASN1.Get (runGet, Result(..))
 import Data.ASN1.BitArray
 import Data.ASN1.Stream
@@ -188,7 +187,7 @@ instance Arbitrary ASN1s where
                                 return ([Start str] ++ l ++ [End str])
 
 prop_header_marshalling_id :: ASN1Header -> Bool
-prop_header_marshalling_id v = (ofDone $ runGet getHeader $ runPut (putHeader v)) == Right v
+prop_header_marshalling_id v = (ofDone $ runGet getHeader $ putHeader v) == Right v
     where ofDone (Done r _ _) = Right r
           ofDone _            = Left "not done"
 
