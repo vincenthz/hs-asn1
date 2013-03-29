@@ -15,9 +15,6 @@ module Data.ASN1.Error
 
 import Control.Exception (Exception)
 import Data.Typeable
-import Data.ByteString (ByteString)
-import Data.ASN1.Types
-import Data.ASN1.Types.Lowlevel
 
 -- | Possible errors during parsing operations
 data ASN1Error = StreamUnexpectedEOC         -- ^ Unexpected EOC in the stream.
