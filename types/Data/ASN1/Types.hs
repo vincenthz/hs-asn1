@@ -13,8 +13,8 @@ module Data.ASN1.Types
     , ASN1ConstructionType(..)
     , ASN1StringEncoding(..)
     , ASN1TimeType(..)
-    , ObjectID
     , ASN1Object(..)
+    , module Data.ASN1.OID
     ) where
 
 import Data.Time.Clock (UTCTime)
@@ -57,7 +57,7 @@ data ASN1 =
     | BitString BitArray
     | OctetString ByteString
     | Null
-    | OID  ObjectID
+    | OID  OID
     | Real Double
     | Enumerated Int
     | ASN1String ASN1StringEncoding ByteString

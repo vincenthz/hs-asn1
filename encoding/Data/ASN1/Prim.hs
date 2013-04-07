@@ -56,7 +56,6 @@ module Data.ASN1.Prim
 import Data.ASN1.Internal
 import Data.ASN1.Stream
 import Data.ASN1.BitArray
-import Data.ASN1.OID (oid, getObjectIDNodes)
 import Data.ASN1.Types
 import Data.ASN1.Types.Lowlevel
 import Data.ASN1.Error
@@ -110,7 +109,7 @@ encodePrimitiveData (IntVal i)          = putInteger i
 encodePrimitiveData (BitString bits)    = putBitString bits
 encodePrimitiveData (OctetString b)     = putString b
 encodePrimitiveData Null                = B.empty
-encodePrimitiveData (OID oidv)          = putOID $ getObjectIDNodes oidv
+encodePrimitiveData (OID oidv)          = putOID oidv
 encodePrimitiveData (Real _)            = B.empty -- not implemented
 encodePrimitiveData (Enumerated i)      = putInteger $ fromIntegral i
 encodePrimitiveData (ASN1String _ b)    = b
@@ -280,7 +279,7 @@ getNull s
 
 {- | return an OID -}
 getOID :: ByteString -> Either ASN1Error ASN1
-getOID s = Right $ OID $ oid (fromIntegral (x `div` 40) : fromIntegral (x `mod` 40) : groupOID xs)
+getOID s = Right $ OID $ (fromIntegral (x `div` 40) : fromIntegral (x `mod` 40) : groupOID xs)
 	where
 		(x:xs) = B.unpack s
 
