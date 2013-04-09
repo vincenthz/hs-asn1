@@ -16,6 +16,7 @@ module Data.ASN1.Parse
         , getNextContainerMaybe
         , getNext
         , hasNext
+        , getObject
         ) where
 
 import Data.ASN1.Types
@@ -38,6 +39,14 @@ runParseASN1State f s =
 -- | run the parse monad over a stream and returns the result.
 runParseASN1 :: ParseASN1 a -> [ASN1] -> Either String a
 runParseASN1 f s = either Left (Right . fst) $ runParseASN1State f s
+
+-- | get next object
+getObject :: ASN1Object a => ParseASN1 a
+getObject = do
+    l <- P (lift get)
+    case fromASN1 l of
+        Left err     -> throwError err
+        Right (a,l2) -> P (lift (put l2)) >> return a
 
 -- | get next element from the stream
 getNext :: ParseASN1 ASN1
