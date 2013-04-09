@@ -24,9 +24,7 @@ import Control.Arrow (first)
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as L
-import Data.ASN1.Error
 import Data.ASN1.Types
-import Data.ASN1.Types.Lowlevel
 import Data.ASN1.Get
 import Data.ASN1.Serialize
 import Data.Word

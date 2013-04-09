@@ -6,13 +6,53 @@
 -- Portability : unknown
 --
 module Data.ASN1.Stream
-    ( ASN1Repr
+    ( ASN1(..)
+    , ASN1Class(..)
+    , ASN1Tag
+    , ASN1Repr
+    , ASN1ConstructionType(..)
     , getConstructedEnd
     , getConstructedEndRepr
     ) where
 
+import Data.ASN1.BitArray
 import Data.ASN1.Types
-import Data.ASN1.Types.Lowlevel
+import Data.ByteString (ByteString)
+import qualified Data.ByteString.Lazy as L
+
+-- | Define the type of container
+data ASN1ConstructionType = Sequence
+                          | Set
+                          | Container ASN1Class ASN1Tag
+                          deriving (Show,Eq)
+
+-- | Define high level ASN1 object.
+data ASN1 = Boolean Bool
+          | IntVal Integer
+          | BitString BitArray
+          | OctetString L.ByteString
+          | Null
+          | OID [Integer]
+          | Real Double
+          | Enumerated
+          | UTF8String String
+          | NumericString L.ByteString
+          | PrintableString String
+          | T61String String
+          | VideoTexString L.ByteString
+          | IA5String String
+          | UTCTime (Int, Int, Int, Int, Int, Int, Bool)
+          | GeneralizedTime (Int, Int, Int, Int, Int, Int, Bool)
+          | GraphicString L.ByteString
+          | VisibleString L.ByteString
+          | GeneralString L.ByteString
+          | UniversalString String
+          | CharacterString L.ByteString
+          | BMPString String
+          | Other ASN1Class ASN1Tag ByteString
+          | Start ASN1ConstructionType
+          | End ASN1ConstructionType
+          deriving (Show, Eq)
 
 {- associate a list of asn1 event with an ASN1 type.
  - it's sometimes required to know the exact byte sequence leading to an ASN1 type:

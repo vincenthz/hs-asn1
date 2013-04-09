@@ -1,5 +1,5 @@
 Name:                asn1-data
-Version:             0.8.0
+Version:             0.7.1
 Description:
     ASN1 data reader and writer in raw form with supports for high level forms of ASN1 (BER, and DER).
 License:             BSD3
@@ -25,10 +25,10 @@ Library
                    , bytestring
                    , text >= 0.11
                    , mtl
-                   , time
-                   , asn1-types >= 0.1 && < 0.2
+                   , cereal
 
-  Exposed-modules:   Data.ASN1.Error
+  Exposed-modules:   Data.ASN1.BitArray
+                     Data.ASN1.Types
                      Data.ASN1.BinaryEncoding
                      Data.ASN1.BinaryEncoding.Raw
                      Data.ASN1.Encoding

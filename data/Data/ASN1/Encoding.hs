@@ -21,7 +21,6 @@ import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as L
 import Data.ASN1.Stream
 import Data.ASN1.Types
-import Data.ASN1.Error
 
 -- | Describe an ASN1 decoding, that transform a bytestream into an asn1stream
 class ASN1Decoding a where

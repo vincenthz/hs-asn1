@@ -15,8 +15,6 @@ module Data.ASN1.BinaryEncoding
 
 import Data.ASN1.Stream
 import Data.ASN1.Types
-import Data.ASN1.Types.Lowlevel
-import Data.ASN1.Error
 import Data.ASN1.Encoding
 import Data.ASN1.BinaryEncoding.Parse
 import Data.ASN1.BinaryEncoding.Writer
