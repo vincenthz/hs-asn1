@@ -44,6 +44,7 @@ data ASN1StringEncoding =
     | Visible   -- ^ International ASCII printing character sets
     | T61       -- ^ teletext
     | UTF32     -- ^ UTF32
+    | Character -- ^ Character
     | BMP       -- ^ UCS2
     deriving (Show,Eq)
 

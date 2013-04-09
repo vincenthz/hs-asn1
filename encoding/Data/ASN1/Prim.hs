@@ -93,6 +93,7 @@ encodeHeader pc len (ASN1String Graphic _)     = ASN1Header Universal 0x19 pc le
 encodeHeader pc len (ASN1String Visible _)     = ASN1Header Universal 0x1a pc len
 encodeHeader pc len (ASN1String General _)     = ASN1Header Universal 0x1b pc len
 encodeHeader pc len (ASN1String UTF32 _)       = ASN1Header Universal 0x1c pc len
+encodeHeader pc len (ASN1String Character _)   = ASN1Header Universal 0x1d pc len
 encodeHeader pc len (ASN1String BMP _)         = ASN1Header Universal 0x1e pc len
 encodeHeader pc len (Start Sequence)           = ASN1Header Universal 0x10 pc len
 encodeHeader pc len (Start Set)                = ASN1Header Universal 0x11 pc len
