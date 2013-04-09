@@ -42,7 +42,7 @@ module Data.ASN1.Prim
 	, getVisibleString
 	, getGeneralString
 	, getUniversalString
-	--, getCharacterString
+	, getCharacterString
 	, getBMPString
 
 	-- * marshall an ASN1 type to a bytestring
@@ -194,7 +194,7 @@ decodePrimitive (ASN1Header Universal 0x19 _ _) p  = getGraphicString p
 decodePrimitive (ASN1Header Universal 0x1a _ _) p  = getVisibleString p
 decodePrimitive (ASN1Header Universal 0x1b _ _) p  = getGeneralString p
 decodePrimitive (ASN1Header Universal 0x1c _ _) p  = getUniversalString p
-decodePrimitive (ASN1Header Universal 0x1d _ _) _  = error "character string not implemented"
+decodePrimitive (ASN1Header Universal 0x1d _ _) p  = getCharacterString p
 decodePrimitive (ASN1Header Universal 0x1e _ _) p  = getBMPString p
 decodePrimitive (ASN1Header tc        tag  _ _) p  = Right $ Other tc tag p
 
@@ -269,6 +269,9 @@ getGeneralString = (ASN1String General <$>) . getString (\_ -> Nothing)
 
 getUniversalString :: ByteString -> Either ASN1Error ASN1
 getUniversalString = (ASN1String UTF32 <$>) . getString (\_ -> Nothing)
+
+getCharacterString :: ByteString -> Either ASN1Error ASN1
+getCharacterString = (ASN1String Character <$>) . getString (\_ -> Nothing)
 
 getBMPString :: ByteString -> Either ASN1Error ASN1
 getBMPString = (ASN1String BMP <$>) . getString (\_ -> Nothing)
