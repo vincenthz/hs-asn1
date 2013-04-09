@@ -75,13 +75,13 @@ instance Arbitrary ASN1Events where
         arbitrary = arbitraryEvents
 
 
-arbitraryOID :: Gen ObjectID
+arbitraryOID :: Gen OID
 arbitraryOID = do
         i1  <- choose (0,2) :: Gen Integer
         i2  <- choose (0,39) :: Gen Integer
         ran <- choose (0,30) :: Gen Int
         l   <- replicateM ran (suchThat arbitrary (\i -> i > 0))
-        return $ oid (i1:i2:l)
+        return $ (i1:i2:l)
 
 arbitraryBSsized :: Int -> Gen B.ByteString
 arbitraryBSsized len = do
