@@ -23,11 +23,11 @@ import Data.ASN1.Types
 import Data.ASN1.Stream
 import Control.Monad.State
 import Control.Monad.Error
-import Control.Applicative ((<$>))
+import Control.Applicative (Applicative, (<$>))
 
 -- | Parse ASN1 Monad
 newtype ParseASN1 a = P { runP :: ErrorT String (State [ASN1]) a }
-        deriving (Functor, Monad, MonadError String)
+        deriving (Functor, Applicative, Monad, MonadError String)
 
 -- | run the parse monad over a stream and returns the result and the remaining ASN1 Stream.
 runParseASN1State :: ParseASN1 a -> [ASN1] -> Either String (a,[ASN1])
