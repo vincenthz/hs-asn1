@@ -8,7 +8,7 @@
 {-# LANGUAGE DeriveDataTypeable #-}
 module Data.ASN1.OID
     ( OID
-    -- * class
+    -- * classes
     , ObjectIdable(..)
     , OIDNameable(..)
     ) where
