@@ -46,10 +46,10 @@ data ASN1StringEncoding =
     | UTF32     -- ^ UTF32
     | Character -- ^ Character
     | BMP       -- ^ UCS2
-    deriving (Show,Eq)
+    deriving (Show,Eq,Ord)
 
 data ASN1TimeType = TimeUTC | TimeGeneralized
-                  deriving (Show,Eq)
+                  deriving (Show,Eq,Ord)
 
 -- | Define high level ASN1 object.
 data ASN1 =
