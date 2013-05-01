@@ -10,6 +10,7 @@ module Data.ASN1.OID
     ( OID
     -- * class
     , ObjectIdable(..)
+    , OIDNameable(..)
     ) where
 
 -- | Standard ASN.1 Object ID (OID)
@@ -19,3 +20,8 @@ type OID = [Integer]
 class ObjectIdable a where
     -- | return the object ID of an Object from the ObjectIdentifiable class.
     getObjectID :: a -> OID
+
+-- | Class of things that can be named by Object ID
+class OIDNameable a where
+    -- | Try to convert an OID into an Object
+    fromObjectID :: OID -> Maybe a
