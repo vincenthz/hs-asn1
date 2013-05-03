@@ -15,8 +15,10 @@ module Data.ASN1.Parse
         , getNextContainer
         , getNextContainerMaybe
         , getNext
+        , getNextMaybe
         , hasNext
         , getObject
+        , getMany
         ) where
 
 import Data.ASN1.Types
@@ -55,6 +57,26 @@ getNext = do
         case list of
                 []    -> throwError "empty"
                 (h:l) -> P (lift (put l)) >> return h
+
+-- | get many elements until there's nothing left
+getMany :: ParseASN1 a -> ParseASN1 [a]
+getMany getOne = do
+    next <- hasNext
+    if next
+        then liftM2 (:) getOne (getMany getOne)
+        else return []
+
+-- | get next element from the stream maybe
+getNextMaybe :: (ASN1 -> Maybe a) -> ParseASN1 (Maybe a)
+getNextMaybe f = do
+        list <- P (lift get)
+        case list of
+                []    -> return Nothing
+                (h:l) -> let r = f h
+                          in do case r of
+                                    Nothing -> P (lift (put list))
+                                    Just _  -> P (lift (put l))
+                                return r
 
 -- | get next container of specified type and return all its elements
 getNextContainer :: ASN1ConstructionType -> ParseASN1 [ASN1]
