@@ -14,6 +14,7 @@ module Data.ASN1.Types
     , ASN1StringEncoding(..)
     , ASN1TimeType(..)
     , ASN1Object(..)
+    , ASN1CharacterString(..)
     , module Data.ASN1.OID
     ) where
 
@@ -22,6 +23,7 @@ import Data.Time.LocalTime (TimeZone)
 import Data.ASN1.BitArray
 import Data.ASN1.OID
 import Data.ASN1.Types.Lowlevel
+import Data.ASN1.Types.String
 import Data.ByteString (ByteString)
 
 -- | Define the type of container
@@ -29,24 +31,6 @@ data ASN1ConstructionType = Sequence
                           | Set
                           | Container ASN1Class ASN1Tag
                           deriving (Show,Eq)
-
--- T61 encoding : http://www.mail-archive.com/asn1@asn1.org/msg00460.html
-
--- | Define all possible ASN1 String encoding.
-data ASN1StringEncoding =
-      IA5       -- ^ 128 characters equivalent to the ASCII alphabet
-    | UTF8      -- ^ UTF8
-    | General   -- ^ all registered graphic and character sets (see ISO 2375) plus SPACE and DELETE.
-    | Graphic   -- ^ all registered G sets and SPACE
-    | Numeric   -- ^ encoding containing numeric [0-9] and space
-    | Printable -- ^ printable [a-z] [A-Z] [()+,-.?:/=] and space.
-    | VideoTex  -- ^ CCITT's T.100 and T.101 character sets
-    | Visible   -- ^ International ASCII printing character sets
-    | T61       -- ^ teletext
-    | UTF32     -- ^ UTF32
-    | Character -- ^ Character
-    | BMP       -- ^ UCS2
-    deriving (Show,Eq,Ord)
 
 data ASN1TimeType = TimeUTC | TimeGeneralized
                   deriving (Show,Eq,Ord)
@@ -61,7 +45,7 @@ data ASN1 =
     | OID  OID
     | Real Double
     | Enumerated Int
-    | ASN1String ASN1StringEncoding ByteString
+    | ASN1String ASN1CharacterString
     | ASN1Time ASN1TimeType UTCTime (Maybe TimeZone)
     | Other ASN1Class ASN1Tag ByteString
     | Start ASN1ConstructionType

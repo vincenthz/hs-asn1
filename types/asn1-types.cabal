@@ -21,6 +21,7 @@ Library
   Exposed-modules:   Data.ASN1.BitArray
                      Data.ASN1.OID
                      Data.ASN1.Types
+                     Data.ASN1.Types.String
                      Data.ASN1.Types.Lowlevel
   ghc-options:       -Wall
 
