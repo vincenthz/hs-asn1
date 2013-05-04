@@ -32,7 +32,9 @@ data ASN1ConstructionType = Sequence
                           | Container ASN1Class ASN1Tag
                           deriving (Show,Eq)
 
-data ASN1TimeType = TimeUTC | TimeGeneralized
+-- | Different ASN1 time representation
+data ASN1TimeType = TimeUTC         -- ^ ASN1 UTCTime Type: limited between 1950-2050
+                  | TimeGeneralized -- ^ ASN1 GeneralizedTime Type
                   deriving (Show,Eq,Ord)
 
 -- | Define high level ASN1 object.
