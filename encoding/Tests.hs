@@ -138,21 +138,22 @@ arbitraryPrintString = do
 arbitraryIA5String = do
         B.pack <$> replicateM 21 (elements $ map toEnum [0..127])
 
-arbitraryString = do
-    encoding <- arbitrary
-    bs <- case encoding of
-            UTF8      -> arbitraryPrintString
-            Numeric   -> arbitraryPrintString
-            Printable -> arbitraryPrintString
-            T61       -> arbitraryPrintString
-            VideoTex  -> arbitraryPrintString
-            IA5       -> arbitraryIA5String
-            Graphic   -> arbitraryPrintString
-            Visible   -> arbitraryPrintString
-            General   -> arbitraryPrintString
-            UTF32     -> arbitraryPrintString
-            BMP       -> arbitraryPrintString
-    return $ ASN1String encoding bs
+instance Arbitrary ASN1CharacterString where
+    arbitrary = do
+        encoding <- arbitrary
+        bs <- case encoding of
+                UTF8      -> arbitraryPrintString
+                Numeric   -> arbitraryPrintString
+                Printable -> arbitraryPrintString
+                T61       -> arbitraryPrintString
+                VideoTex  -> arbitraryPrintString
+                IA5       -> arbitraryIA5String
+                Graphic   -> arbitraryPrintString
+                Visible   -> arbitraryPrintString
+                General   -> arbitraryPrintString
+                UTF32     -> arbitraryPrintString
+                BMP       -> arbitraryPrintString
+        return $ ASN1CharacterString encoding bs
 
 instance Arbitrary ASN1 where
         arbitrary = oneof
@@ -164,7 +165,7 @@ instance Arbitrary ASN1 where
                 , liftM OID arbitraryOID
                 --, Real Double
                 -- , return Enumerated
-                , arbitraryString
+                , ASN1String <$> arbitrary
                 , ASN1Time <$> arbitrary <*> arbitrary <*> arbitrary
                 ]
 

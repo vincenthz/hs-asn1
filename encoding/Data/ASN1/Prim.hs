@@ -29,21 +29,9 @@ module Data.ASN1.Prim
 	, getInteger
 	, getBitString
 	, getOctetString
-	, getUTF8String
-	, getNumericString
-	, getPrintableString
-	, getT61String
-	, getVideoTexString
-	, getIA5String
 	, getNull
 	, getOID
 	, getTime
-	, getGraphicString
-	, getVisibleString
-	, getGeneralString
-	, getUniversalString
-	, getCharacterString
-	, getBMPString
 
 	-- * marshall an ASN1 type to a bytestring
 	, putTime
@@ -81,20 +69,21 @@ encodeHeader pc len Null                       = ASN1Header Universal 0x5 pc len
 encodeHeader pc len (OID _)                    = ASN1Header Universal 0x6 pc len
 encodeHeader pc len (Real _)                   = ASN1Header Universal 0x9 pc len
 encodeHeader pc len (Enumerated _)             = ASN1Header Universal 0xa pc len
-encodeHeader pc len (ASN1String UTF8 _)        = ASN1Header Universal 0xc pc len
-encodeHeader pc len (ASN1String Numeric _)     = ASN1Header Universal 0x12 pc len
-encodeHeader pc len (ASN1String Printable _)   = ASN1Header Universal 0x13 pc len
-encodeHeader pc len (ASN1String T61 _)         = ASN1Header Universal 0x14 pc len
-encodeHeader pc len (ASN1String VideoTex _)    = ASN1Header Universal 0x15 pc len
-encodeHeader pc len (ASN1String IA5 _)         = ASN1Header Universal 0x16 pc len
+encodeHeader pc len (ASN1String cs)            = ASN1Header Universal (characterStringType $ characterEncoding cs) pc len
+  where characterStringType UTF8      = 0xc
+        characterStringType Numeric   = 0x12
+        characterStringType Printable = 0x13
+        characterStringType T61 = 0x14
+        characterStringType VideoTex = 0x15
+        characterStringType IA5 = 0x16
+        characterStringType Graphic = 0x19
+        characterStringType Visible = 0x1a
+        characterStringType General = 0x1b
+        characterStringType UTF32 = 0x1c
+        characterStringType Character = 0x1d
+        characterStringType BMP = 0x1e
 encodeHeader pc len (ASN1Time TimeUTC _ _)     = ASN1Header Universal 0x17 pc len
 encodeHeader pc len (ASN1Time TimeGeneralized _ _) = ASN1Header Universal 0x18 pc len
-encodeHeader pc len (ASN1String Graphic _)     = ASN1Header Universal 0x19 pc len
-encodeHeader pc len (ASN1String Visible _)     = ASN1Header Universal 0x1a pc len
-encodeHeader pc len (ASN1String General _)     = ASN1Header Universal 0x1b pc len
-encodeHeader pc len (ASN1String UTF32 _)       = ASN1Header Universal 0x1c pc len
-encodeHeader pc len (ASN1String Character _)   = ASN1Header Universal 0x1d pc len
-encodeHeader pc len (ASN1String BMP _)         = ASN1Header Universal 0x1e pc len
 encodeHeader pc len (Start Sequence)           = ASN1Header Universal 0x10 pc len
 encodeHeader pc len (Start Set)                = ASN1Header Universal 0x11 pc len
 encodeHeader pc len (Start (Container tc tag)) = ASN1Header tc tag pc len
@@ -113,7 +102,7 @@ encodePrimitiveData Null                = B.empty
 encodePrimitiveData (OID oidv)          = putOID oidv
 encodePrimitiveData (Real _)            = B.empty -- not implemented
 encodePrimitiveData (Enumerated i)      = putInteger $ fromIntegral i
-encodePrimitiveData (ASN1String _ b)    = b
+encodePrimitiveData (ASN1String cs)     = getCharacterStringRawData cs
 encodePrimitiveData (ASN1Time ty ti tz) = putTime ty ti tz
 encodePrimitiveData (Other _ _ b)       = b
 encodePrimitiveData o                   = error ("not a primitive " ++ show o)
@@ -179,23 +168,23 @@ decodePrimitive (ASN1Header Universal 0x8 _ _) _   = Left $ TypeNotImplemented "
 decodePrimitive (ASN1Header Universal 0x9 _ _) _   = Left $ TypeNotImplemented "real"
 decodePrimitive (ASN1Header Universal 0xa _ _) _   = Left $ TypeNotImplemented "enumerated"
 decodePrimitive (ASN1Header Universal 0xb _ _) _   = Left $ TypeNotImplemented "EMBEDDED PDV"
-decodePrimitive (ASN1Header Universal 0xc _ _) p   = getUTF8String p
+decodePrimitive (ASN1Header Universal 0xc _ _) p   = getCharacterString UTF8 p
 decodePrimitive (ASN1Header Universal 0xd _ _) _   = Left $ TypeNotImplemented "RELATIVE-OID"
 decodePrimitive (ASN1Header Universal 0x10 _ _) _  = error "sequence not a primitive"
 decodePrimitive (ASN1Header Universal 0x11 _ _) _  = error "set not a primitive"
-decodePrimitive (ASN1Header Universal 0x12 _ _) p  = getNumericString p
-decodePrimitive (ASN1Header Universal 0x13 _ _) p  = getPrintableString p
-decodePrimitive (ASN1Header Universal 0x14 _ _) p  = getT61String p
-decodePrimitive (ASN1Header Universal 0x15 _ _) p  = getVideoTexString p
-decodePrimitive (ASN1Header Universal 0x16 _ _) p  = getIA5String p
+decodePrimitive (ASN1Header Universal 0x12 _ _) p  = getCharacterString Numeric p
+decodePrimitive (ASN1Header Universal 0x13 _ _) p  = getCharacterString Printable p
+decodePrimitive (ASN1Header Universal 0x14 _ _) p  = getCharacterString T61 p
+decodePrimitive (ASN1Header Universal 0x15 _ _) p  = getCharacterString VideoTex p
+decodePrimitive (ASN1Header Universal 0x16 _ _) p  = getCharacterString IA5 p
 decodePrimitive (ASN1Header Universal 0x17 _ _) p  = getTime TimeUTC p
 decodePrimitive (ASN1Header Universal 0x18 _ _) p  = getTime TimeGeneralized p
-decodePrimitive (ASN1Header Universal 0x19 _ _) p  = getGraphicString p
-decodePrimitive (ASN1Header Universal 0x1a _ _) p  = getVisibleString p
-decodePrimitive (ASN1Header Universal 0x1b _ _) p  = getGeneralString p
-decodePrimitive (ASN1Header Universal 0x1c _ _) p  = getUniversalString p
-decodePrimitive (ASN1Header Universal 0x1d _ _) p  = getCharacterString p
-decodePrimitive (ASN1Header Universal 0x1e _ _) p  = getBMPString p
+decodePrimitive (ASN1Header Universal 0x19 _ _) p  = getCharacterString Graphic p
+decodePrimitive (ASN1Header Universal 0x1a _ _) p  = getCharacterString Visible p
+decodePrimitive (ASN1Header Universal 0x1b _ _) p  = getCharacterString General p
+decodePrimitive (ASN1Header Universal 0x1c _ _) p  = getCharacterString UTF32 p
+decodePrimitive (ASN1Header Universal 0x1d _ _) p  = getCharacterString Character p
+decodePrimitive (ASN1Header Universal 0x1e _ _) p  = getCharacterString BMP p
 decodePrimitive (ASN1Header tc        tag  _ _) p  = Right $ Other tc tag p
 
 
@@ -231,50 +220,11 @@ getBitString s =
 		then Right $ BitString $ toBitArray xs (fromIntegral toSkip')
 		else Left $ TypeDecodingFailed ("bitstring: skip number not within bound " ++ show toSkip' ++ " " ++  show s)
 
-getString :: (ByteString -> Maybe ASN1Error) -> ByteString -> Either ASN1Error ByteString
-getString check s =
-	case check s of
-		Nothing  -> Right s
-		Just err -> Left err
+getCharacterString :: ASN1StringEncoding -> ByteString -> Either ASN1Error ASN1
+getCharacterString encoding bs = Right $ ASN1String (ASN1CharacterString encoding bs)
 
 getOctetString :: ByteString -> Either ASN1Error ASN1
 getOctetString = Right . OctetString
-
-getNumericString :: ByteString -> Either ASN1Error ASN1
-getNumericString = (ASN1String Numeric <$>) . getString (\_ -> Nothing)
-
-getPrintableString :: ByteString -> Either ASN1Error ASN1
-getPrintableString = (ASN1String Printable <$>) . getString (\_ -> Nothing)
-
-getUTF8String :: ByteString -> Either ASN1Error ASN1
-getUTF8String = (ASN1String UTF8 <$>) . getString (\_ -> Nothing)
-
-getT61String :: ByteString -> Either ASN1Error ASN1
-getT61String = (ASN1String T61 <$>) . getString (\_ -> Nothing)
-
-getVideoTexString :: ByteString -> Either ASN1Error ASN1
-getVideoTexString = (ASN1String VideoTex <$>) . getString (\_ -> Nothing)
-
-getIA5String :: ByteString -> Either ASN1Error ASN1
-getIA5String = (ASN1String IA5 <$>) . getString (\_ -> Nothing)
-
-getGraphicString :: ByteString -> Either ASN1Error ASN1
-getGraphicString = (ASN1String Graphic <$>) . getString (\_ -> Nothing)
-
-getVisibleString :: ByteString -> Either ASN1Error ASN1
-getVisibleString = (ASN1String Visible <$>) . getString (\_ -> Nothing)
-
-getGeneralString :: ByteString -> Either ASN1Error ASN1
-getGeneralString = (ASN1String General <$>) . getString (\_ -> Nothing)
-
-getUniversalString :: ByteString -> Either ASN1Error ASN1
-getUniversalString = (ASN1String UTF32 <$>) . getString (\_ -> Nothing)
-
-getCharacterString :: ByteString -> Either ASN1Error ASN1
-getCharacterString = (ASN1String Character <$>) . getString (\_ -> Nothing)
-
-getBMPString :: ByteString -> Either ASN1Error ASN1
-getBMPString = (ASN1String BMP <$>) . getString (\_ -> Nothing)
 
 getNull :: ByteString -> Either ASN1Error ASN1
 getNull s
