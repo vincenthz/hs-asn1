@@ -1,5 +1,5 @@
 -- |
--- Module      : Data.ASN1.Stream
+-- Module      : Data.ASN1.Types
 -- License     : BSD-style
 -- Maintainer  : Vincent Hanquez <vincent@snarc.org>
 -- Stability   : experimental
