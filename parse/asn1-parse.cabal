@@ -19,7 +19,7 @@ Library
                    , text >= 0.11
                    , mtl
                    , time
-                   , asn1-types >= 0.1 && < 0.2
+                   , asn1-types >= 0.2 && < 0.3
                    , asn1-encoding >= 0.8
 
   Exposed-modules:   Data.ASN1.Parse
