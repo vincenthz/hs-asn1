@@ -131,29 +131,34 @@ instance Arbitrary ASN1TimeType where
 instance Arbitrary ASN1StringEncoding where
     arbitrary = elements [UTF8, Numeric, Printable, T61, VideoTex, IA5, Graphic, Visible, General, UTF32, BMP]
 
-arbitraryPrintString = do
-        let printableString = (['a'..'z'] ++ ['A'..'Z'] ++ ['0'..'9'] ++ " ()+,-./:=?")
-        BC.pack <$> replicateM 21 (elements printableString)
+arbitraryPrintString encoding = do
+    let printableString = (['a'..'z'] ++ ['A'..'Z'] ++ ['0'..'9'] ++ " ()+,-./:=?")
+    asn1CharacterString encoding <$> replicateM 21 (elements printableString)
 
-arbitraryIA5String = do
-        B.pack <$> replicateM 21 (elements $ map toEnum [0..127])
+arbitraryBS encoding = ASN1CharacterString encoding . B.pack <$> replicateM 7 (choose (0,0xff))
+
+arbitraryIA5String = asn1CharacterString IA5 <$> replicateM 21 (choose (toEnum 0,toEnum 127))
+
+arbitraryUCS2 :: Gen ASN1CharacterString
+arbitraryUCS2 = asn1CharacterString BMP <$> replicateM 12 (choose (toEnum 0,toEnum 0xffff))
+
+arbitraryUnicode :: ASN1StringEncoding -> Gen ASN1CharacterString
+arbitraryUnicode e = asn1CharacterString e <$> replicateM 35 (choose (toEnum 0,toEnum 0x10ffff))
 
 instance Arbitrary ASN1CharacterString where
-    arbitrary = do
-        encoding <- arbitrary
-        bs <- case encoding of
-                UTF8      -> arbitraryPrintString
-                Numeric   -> arbitraryPrintString
-                Printable -> arbitraryPrintString
-                T61       -> arbitraryPrintString
-                VideoTex  -> arbitraryPrintString
-                IA5       -> arbitraryIA5String
-                Graphic   -> arbitraryPrintString
-                Visible   -> arbitraryPrintString
-                General   -> arbitraryPrintString
-                UTF32     -> arbitraryPrintString
-                BMP       -> arbitraryPrintString
-        return $ ASN1CharacterString encoding bs
+    arbitrary = oneof
+            [ arbitraryUnicode UTF8
+            , arbitraryUnicode UTF32
+            , arbitraryUCS2
+            , arbitraryPrintString Numeric
+            , arbitraryPrintString Printable
+            , arbitraryBS T61
+            , arbitraryBS VideoTex
+            , arbitraryIA5String
+            , arbitraryPrintString Graphic
+            , arbitraryPrintString Visible
+            , arbitraryPrintString General
+            ]
 
 instance Arbitrary ASN1 where
         arbitrary = oneof
