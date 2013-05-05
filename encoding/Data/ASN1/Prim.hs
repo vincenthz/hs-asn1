@@ -58,7 +58,6 @@ import Data.Time.Calendar
 import Data.Time.Clock
 import Data.Time.LocalTime
 import Control.Arrow (first)
-import Control.Applicative
 
 encodeHeader :: Bool -> ASN1Length -> ASN1 -> ASN1Header
 encodeHeader pc len (Boolean _)                = ASN1Header Universal 0x1 pc len
