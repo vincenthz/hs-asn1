@@ -15,6 +15,8 @@ module Data.ASN1.Types
     , ASN1TimeType(..)
     , ASN1Object(..)
     , ASN1CharacterString(..)
+    , asn1CharacterString
+    , asn1CharacterToString
     , module Data.ASN1.OID
     ) where
 
