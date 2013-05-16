@@ -20,7 +20,12 @@ import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 import Data.Bits
 
--- T61 encoding : http://www.mail-archive.com/asn1@asn1.org/msg00460.html
+-- a note on T61 encodings. The actual specification of a T61 character set seems
+-- to be lost in time, as such it will be considered an ascii like encoding.
+--
+-- <http://www.mail-archive.com/asn1@asn1.org/msg00460.html>
+-- "sizable volume of software in the world treats TeletexString (T61String)
+-- as a simple 8-bit string with mostly Windows Latin 1"
 
 -- | Define all possible ASN1 String encoding.
 data ASN1StringEncoding =
@@ -47,7 +52,7 @@ stringEncodingFunctions encoding
     | encoding == UTF32                  = Just (decodeUTF32, encodeUTF32)
     | encoding `elem` asciiLikeEncodings = Just (decodeASCII, encodeASCII)
     | otherwise                          = Nothing
-  where asciiLikeEncodings = [IA5,Numeric,Printable,Visible,General,Graphic]
+  where asciiLikeEncodings = [IA5,Numeric,Printable,Visible,General,Graphic,T61]
 
 -- | encode a string into a character string
 asn1CharacterString :: ASN1StringEncoding -> String -> ASN1CharacterString
