@@ -57,6 +57,7 @@ import qualified Data.ByteString as B
 import Data.Time.Calendar
 import Data.Time.Clock
 import Data.Time.LocalTime
+import Control.Applicative
 import Control.Arrow (first)
 
 encodeHeader :: Bool -> ASN1Length -> ASN1 -> ASN1Header
@@ -165,7 +166,7 @@ decodePrimitive (ASN1Header Universal 0x6 _ _) p   = getOID p
 decodePrimitive (ASN1Header Universal 0x7 _ _) _   = Left $ TypeNotImplemented "Object Descriptor"
 decodePrimitive (ASN1Header Universal 0x8 _ _) _   = Left $ TypeNotImplemented "External"
 decodePrimitive (ASN1Header Universal 0x9 _ _) _   = Left $ TypeNotImplemented "real"
-decodePrimitive (ASN1Header Universal 0xa _ _) _   = Left $ TypeNotImplemented "enumerated"
+decodePrimitive (ASN1Header Universal 0xa _ _) p   = getEnumerated p
 decodePrimitive (ASN1Header Universal 0xb _ _) _   = Left $ TypeNotImplemented "EMBEDDED PDV"
 decodePrimitive (ASN1Header Universal 0xc _ _) p   = getCharacterString UTF8 p
 decodePrimitive (ASN1Header Universal 0xd _ _) _   = Left $ TypeNotImplemented "RELATIVE-OID"
@@ -198,17 +199,26 @@ getBoolean isDer s =
 
 {- | getInteger, parse a value bytestring and get the integer out of the two complement encoded bytes -}
 getInteger :: ByteString -> Either ASN1Error ASN1
-getInteger s
-	| B.length s == 0 = Left $ TypeDecodingFailed "integer: null encoding"
-	| B.length s == 1 = Right $ IntVal $ snd $ intOfBytes s
+{-# INLINE getInteger #-}
+getInteger s = IntVal <$> getIntegerRaw "integer" s
+
+{- | getEnumerated, parse an enumerated value the same way that integer values are parsed. -}
+getEnumerated :: ByteString -> Either ASN1Error ASN1
+{-# INLINE getEnumerated #-}
+getEnumerated s = Enumerated <$> getIntegerRaw "enumerated" s
+
+{- | According to X.690 section 8.4 integer and enumerated values should be encoded the same way. -}
+getIntegerRaw :: String -> ByteString -> Either ASN1Error Integer
+getIntegerRaw typestr s
+	| B.length s == 0 = Left . TypeDecodingFailed $ typestr ++ ": null encoding"
+	| B.length s == 1 = Right $ snd $ intOfBytes s
 	| otherwise       =
 		if (v1 == 0xff && testBit v2 7) || (v1 == 0x0 && (not $ testBit v2 7))
-			then Left $ TypeDecodingFailed "integer: not shortest encoding"
-			else Right $ IntVal $ snd $ intOfBytes s
+			then Left . TypeDecodingFailed $ typestr ++ ": not shortest encoding"
+			else Right $ snd $ intOfBytes s
 		where
 			v1 = s `B.index` 0
 			v2 = s `B.index` 1
-
 
 getBitString :: ByteString -> Either ASN1Error ASN1
 getBitString s =

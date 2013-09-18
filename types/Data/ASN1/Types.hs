@@ -48,7 +48,7 @@ data ASN1 =
     | Null
     | OID  OID
     | Real Double
-    | Enumerated Int
+    | Enumerated Integer
     | ASN1String ASN1CharacterString
     | ASN1Time ASN1TimeType UTCTime (Maybe TimeZone)
     | Other ASN1Class ASN1Tag ByteString
