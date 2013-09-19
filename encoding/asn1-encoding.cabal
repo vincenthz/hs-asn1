@@ -1,5 +1,5 @@
 Name:                asn1-encoding
-Version:             0.8.1
+Version:             0.8.1.1
 Description:
     ASN1 data reader and writer in raw form with supports for high level forms of ASN1 (BER, and DER).
 License:             BSD3
@@ -24,7 +24,7 @@ Library
                    , text >= 0.11
                    , mtl
                    , time
-                   , asn1-types >= 0.2 && < 0.3
+                   , asn1-types >= 0.2.1 && < 0.3
 
   Exposed-modules:   Data.ASN1.Error
                      Data.ASN1.BinaryEncoding
