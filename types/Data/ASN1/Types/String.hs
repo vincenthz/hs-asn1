@@ -19,6 +19,7 @@ import Data.ByteString (ByteString)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 import Data.Bits
+import Data.Word
 
 -- a note on T61 encodings. The actual specification of a T61 character set seems
 -- to be lost in time, as such it will be considered an ascii like encoding.
@@ -78,23 +79,35 @@ instance IsString ASN1CharacterString where
     fromString s = ASN1CharacterString UTF8 (encodeUTF8 s)
 
 decodeUTF8 :: ByteString -> String
-decodeUTF8 b
-    | B.null b  = []
-    | otherwise =
-        case B.index b 0 of
-            v | v `isClear` 7 -> toEnum (fromIntegral v) : decodeUTF8 (B.drop 1 b)
-              | v `isClear` 6 -> error "continuation byte"
-              | v `isClear` 5 -> uncont 1 (v .&. 0x1f)
-              | v `isClear` 4 -> uncont 2 (v .&. 0xf)
-              | v `isClear` 3 -> uncont 3 (v .&. 0x7)
-              | otherwise     -> error "too many byte"
-  where uncont n iniV
-            | B.length b < (n+1) = error "cannot decode"
-            | otherwise          = let z = flip map [1..n] $ \i ->
-                                        case B.index b (i+1) of
-                                            v | v `testBit` 7 && v `isClear` 6 -> v .&. 0x3f
-                                              | otherwise                      -> error "not a continuation byte"
-                                    in (toEnum $ fromIntegral $ foldl (\acc v -> (acc `shiftL` 6) + v) iniV z) : decodeUTF8 (B.drop (1+n) b)
+decodeUTF8 b = loop 0 $ B.unpack b
+  where loop :: Int -> [Word8] -> [Char]
+        loop _   []     = []
+        loop pos (x:xs)
+            | x `isClear` 7 = toEnum (fromIntegral x) : loop (pos+1) xs
+            | x `isClear` 6 = error "continuation byte in heading context"
+            | x `isClear` 5 = uncont 1 (x .&. 0x1f) pos xs
+            | x `isClear` 4 = uncont 2 (x .&. 0xf)  pos xs
+            | x `isClear` 3 = uncont 3 (x .&. 0x7)  pos xs
+            | otherwise     = error "too many byte"
+        uncont :: Int -> Word8 -> Int -> [Word8] -> [Char]
+        uncont 1 iniV pos xs =
+            case xs of
+                c1:xs' -> decodeCont iniV [c1] : loop (pos+2) xs'
+                _      -> error "truncated continuation, expecting 1 byte"
+        uncont 2 iniV pos xs =
+            case xs of
+                c1:c2:xs' -> decodeCont iniV [c1,c2] : loop (pos+3) xs'
+                _         -> error "truncated continuation, expecting 2 bytes"
+        uncont 3 iniV pos xs =
+            case xs of
+                c1:c2:c3:xs' -> decodeCont iniV [c1,c2,c3] : loop (pos+4) xs'
+                _            -> error "truncated continuation, expecting 3 bytes"
+        uncont _ _ _ _ = error "invalid number of bytes for continuation"
+        decodeCont :: Word8 -> [Word8] -> Char
+        decodeCont iniV l
+            | all isContByte l = toEnum $ foldl (\acc v -> (acc `shiftL` 6) + fromIntegral v) (fromIntegral iniV) $ map (\v -> v .&. 0x3f) l
+            | otherwise        = error "continuation bytes invalid"
+        isContByte v = v `testBit` 7 && v `isClear` 6
         isClear v i = not (v `testBit` i)
 
 encodeUTF8 :: String -> ByteString
