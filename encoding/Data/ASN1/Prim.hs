@@ -10,36 +10,36 @@
 
 {-# LANGUAGE ViewPatterns #-}
 module Data.ASN1.Prim
-	(
-	-- * ASN1 high level algebraic type
-	  ASN1(..)
-	, ASN1ConstructionType(..)
+    (
+    -- * ASN1 high level algebraic type
+      ASN1(..)
+    , ASN1ConstructionType(..)
 
-	, encodeHeader
-	, encodePrimitiveHeader
-	, encodePrimitive
-	, decodePrimitive
-	, encodeConstructed
-	, encodeList
-	, encodeOne
-	, mkSmallestLength
+    , encodeHeader
+    , encodePrimitiveHeader
+    , encodePrimitive
+    , decodePrimitive
+    , encodeConstructed
+    , encodeList
+    , encodeOne
+    , mkSmallestLength
 
-	-- * marshall an ASN1 type from a val struct or a bytestring
-	, getBoolean
-	, getInteger
-	, getBitString
-	, getOctetString
-	, getNull
-	, getOID
-	, getTime
+    -- * marshall an ASN1 type from a val struct or a bytestring
+    , getBoolean
+    , getInteger
+    , getBitString
+    , getOctetString
+    , getNull
+    , getOID
+    , getTime
 
-	-- * marshall an ASN1 type to a bytestring
-	, putTime
-	, putInteger
-	, putBitString
-	, putString
-	, putOID
-	) where
+    -- * marshall an ASN1 type to a bytestring
+    , putTime
+    , putInteger
+    , putBitString
+    , putString
+    , putOID
+    ) where
 
 import Data.ASN1.Internal
 import Data.ASN1.Stream
@@ -73,15 +73,15 @@ encodeHeader pc len (ASN1String cs)            = ASN1Header Universal (character
   where characterStringType UTF8      = 0xc
         characterStringType Numeric   = 0x12
         characterStringType Printable = 0x13
-        characterStringType T61 = 0x14
-        characterStringType VideoTex = 0x15
-        characterStringType IA5 = 0x16
-        characterStringType Graphic = 0x19
-        characterStringType Visible = 0x1a
-        characterStringType General = 0x1b
-        characterStringType UTF32 = 0x1c
+        characterStringType T61       = 0x14
+        characterStringType VideoTex  = 0x15
+        characterStringType IA5       = 0x16
+        characterStringType Graphic   = 0x19
+        characterStringType Visible   = 0x1a
+        characterStringType General   = 0x1b
+        characterStringType UTF32     = 0x1c
         characterStringType Character = 0x1d
-        characterStringType BMP = 0x1e
+        characterStringType BMP       = 0x1e
 encodeHeader pc len (ASN1Time TimeUTC _ _)     = ASN1Header Universal 0x17 pc len
 encodeHeader pc len (ASN1Time TimeGeneralized _ _) = ASN1Header Universal 0x18 pc len
 encodeHeader pc len (Start Sequence)           = ASN1Header Universal 0x10 pc len
@@ -109,16 +109,16 @@ encodePrimitiveData o                   = error ("not a primitive " ++ show o)
 
 encodePrimitive :: ASN1 -> (Int, [ASN1Event])
 encodePrimitive a =
-	let b = encodePrimitiveData a in
-	let blen = B.length b in
-	let len = makeLength blen in
-	let hdr = encodePrimitiveHeader len a in
-	(B.length (putHeader hdr) + blen, [Header hdr, Primitive b])
-	where
-		makeLength len
-			| len < 0x80 = LenShort len
-			| otherwise  = LenLong (nbBytes len) len
-		nbBytes nb = if nb > 255 then 1 + nbBytes (nb `div` 256) else 1
+    let b = encodePrimitiveData a
+        blen = B.length b
+        len = makeLength blen
+        hdr = encodePrimitiveHeader len a
+     in (B.length (putHeader hdr) + blen, [Header hdr, Primitive b])
+  where
+        makeLength len
+            | len < 0x80 = LenShort len
+            | otherwise  = LenLong (nbBytes len) len
+        nbBytes nb = if nb > 255 then 1 + nbBytes (nb `div` 256) else 1
 
 encodeOne :: ASN1 -> (Int, [ASN1Event])
 encodeOne (Start _) = error "encode one cannot do start"
@@ -128,31 +128,31 @@ encodeList :: [ASN1] -> (Int, [ASN1Event])
 encodeList []               = (0, [])
 encodeList (End _:xs)       = encodeList xs
 encodeList (t@(Start _):xs) =
-	let (ys, zs)    = getConstructedEnd 0 xs in
-	let (llen, lev) = encodeList zs in
-	let (len, ev)   = encodeConstructed t ys in
-	(llen + len, ev ++ lev)
+    let (ys, zs)    = getConstructedEnd 0 xs
+        (llen, lev) = encodeList zs
+        (len, ev)   = encodeConstructed t ys
+     in (llen + len, ev ++ lev)
 
 encodeList (x:xs)           =
-	let (llen, lev) = encodeList xs in
-	let (len, ev)   = encodeOne x in
-	(llen + len, ev ++ lev)
+    let (llen, lev) = encodeList xs
+        (len, ev)   = encodeOne x
+     in (llen + len, ev ++ lev)
 
 encodeConstructed :: ASN1 -> [ASN1] -> (Int, [ASN1Event])
 encodeConstructed c@(Start _) children =
-	let (clen, events) = encodeList children in
-	let len = mkSmallestLength clen in
-	let h = encodeHeader True len c in
-	let tlen = B.length (putHeader h) + clen in
-	(tlen, Header h : ConstructionBegin : events ++ [ConstructionEnd])
+    (tlen, Header h : ConstructionBegin : events ++ [ConstructionEnd])
+  where (clen, events) = encodeList children
+        len  = mkSmallestLength clen
+        h    = encodeHeader True len c
+        tlen = B.length (putHeader h) + clen
 
 encodeConstructed _ _ = error "not a start node"
 
 mkSmallestLength :: Int -> ASN1Length
 mkSmallestLength i
-	| i < 0x80  = LenShort i
-	| otherwise = LenLong (nbBytes i) i
-		where nbBytes nb = if nb > 255 then 1 + nbBytes (nb `div` 256) else 1
+    | i < 0x80  = LenShort i
+    | otherwise = LenLong (nbBytes i) i
+        where nbBytes nb = if nb > 255 then 1 + nbBytes (nb `div` 256) else 1
 
 type ASN1Ret = Either ASN1Error ASN1
 
@@ -190,12 +190,12 @@ decodePrimitive (ASN1Header tc        tag  _ _) p  = Right $ Other tc tag p
 
 getBoolean :: Bool -> ByteString -> Either ASN1Error ASN1
 getBoolean isDer s =
-	if B.length s == 1
-		then case B.head s of
-			0    -> Right (Boolean False)
-			0xff -> Right (Boolean True)
-			_    -> if isDer then Left $ PolicyFailed "DER" "boolean value not canonical" else Right (Boolean True)
-		else Left $ TypeDecodingFailed "boolean: length not within bound"
+    if B.length s == 1
+        then case B.head s of
+            0    -> Right (Boolean False)
+            0xff -> Right (Boolean True)
+            _    -> if isDer then Left $ PolicyFailed "DER" "boolean value not canonical" else Right (Boolean True)
+        else Left $ TypeDecodingFailed "boolean: length not within bound"
 
 {- | getInteger, parse a value bytestring and get the integer out of the two complement encoded bytes -}
 getInteger :: ByteString -> Either ASN1Error ASN1
@@ -210,24 +210,24 @@ getEnumerated s = Enumerated <$> getIntegerRaw "enumerated" s
 {- | According to X.690 section 8.4 integer and enumerated values should be encoded the same way. -}
 getIntegerRaw :: String -> ByteString -> Either ASN1Error Integer
 getIntegerRaw typestr s
-	| B.length s == 0 = Left . TypeDecodingFailed $ typestr ++ ": null encoding"
-	| B.length s == 1 = Right $ snd $ intOfBytes s
-	| otherwise       =
-		if (v1 == 0xff && testBit v2 7) || (v1 == 0x0 && (not $ testBit v2 7))
-			then Left . TypeDecodingFailed $ typestr ++ ": not shortest encoding"
-			else Right $ snd $ intOfBytes s
-		where
-			v1 = s `B.index` 0
-			v2 = s `B.index` 1
+    | B.length s == 0 = Left . TypeDecodingFailed $ typestr ++ ": null encoding"
+    | B.length s == 1 = Right $ snd $ intOfBytes s
+    | otherwise       =
+        if (v1 == 0xff && testBit v2 7) || (v1 == 0x0 && (not $ testBit v2 7))
+            then Left . TypeDecodingFailed $ typestr ++ ": not shortest encoding"
+            else Right $ snd $ intOfBytes s
+        where
+            v1 = s `B.index` 0
+            v2 = s `B.index` 1
 
 getBitString :: ByteString -> Either ASN1Error ASN1
 getBitString s =
-	let toSkip = B.head s in
-	let toSkip' = if toSkip >= 48 && toSkip <= 48 + 7 then toSkip - (fromIntegral $ ord '0') else toSkip in
-	let xs = B.tail s in
-	if toSkip' >= 0 && toSkip' <= 7
-		then Right $ BitString $ toBitArray xs (fromIntegral toSkip')
-		else Left $ TypeDecodingFailed ("bitstring: skip number not within bound " ++ show toSkip' ++ " " ++  show s)
+    let toSkip = B.head s in
+    let toSkip' = if toSkip >= 48 && toSkip <= 48 + 7 then toSkip - (fromIntegral $ ord '0') else toSkip in
+    let xs = B.tail s in
+    if toSkip' >= 0 && toSkip' <= 7
+        then Right $ BitString $ toBitArray xs (fromIntegral toSkip')
+        else Left $ TypeDecodingFailed ("bitstring: skip number not within bound " ++ show toSkip' ++ " " ++  show s)
 
 getCharacterString :: ASN1StringEncoding -> ByteString -> Either ASN1Error ASN1
 getCharacterString encoding bs = Right $ ASN1String (ASN1CharacterString encoding bs)
@@ -243,21 +243,21 @@ getNull s
 {- | return an OID -}
 getOID :: ByteString -> Either ASN1Error ASN1
 getOID s = Right $ OID $ (fromIntegral (x `div` 40) : fromIntegral (x `mod` 40) : groupOID xs)
-	where
-		(x:xs) = B.unpack s
+  where
+        (x:xs) = B.unpack s
 
-		groupOID :: [Word8] -> [Integer]
-		groupOID = map (foldl (\acc n -> (acc `shiftL` 7) + fromIntegral n) 0) . groupSubOID
+        groupOID :: [Word8] -> [Integer]
+        groupOID = map (foldl (\acc n -> (acc `shiftL` 7) + fromIntegral n) 0) . groupSubOID
 
-		groupSubOIDHelper [] = Nothing
-		groupSubOIDHelper l  = Just $ spanSubOIDbound l
+        groupSubOIDHelper [] = Nothing
+        groupSubOIDHelper l  = Just $ spanSubOIDbound l
 
-		groupSubOID :: [Word8] -> [[Word8]]
-		groupSubOID = unfoldr groupSubOIDHelper
+        groupSubOID :: [Word8] -> [[Word8]]
+        groupSubOID = unfoldr groupSubOIDHelper
 
-		spanSubOIDbound [] = ([], [])
-		spanSubOIDbound (a:as) = if testBit a 7 then (clearBit a 7 : ys, zs) else ([a], as)
-			where (ys, zs) = spanSubOIDbound as
+        spanSubOIDbound [] = ([], [])
+        spanSubOIDbound (a:as) = if testBit a 7 then (clearBit a 7 : ys, zs) else ([a], as)
+            where (ys, zs) = spanSubOIDbound as
 
 getTime :: ASN1TimeType -> ByteString -> Either ASN1Error ASN1
 getTime timeType (B.unpack -> b) = Right $ ASN1Time timeType (UTCTime cDay cDiffTime) tz
@@ -311,7 +311,7 @@ getTime timeType (B.unpack -> b) = Right $ ASN1Time timeType (UTCTime cDay cDiff
 
 putTime :: ASN1TimeType -> UTCTime -> Maybe TimeZone  -> ByteString
 putTime ty (UTCTime day diff) mtz = B.pack etime
-    where
+  where
         etime
             | ty == TimeUTC = [y3, y4, m1, m2, d1, d2, h1, h2, mi1, mi2, s1, s2]++tzStr
             | otherwise     = [y1, y2, y3, y4, m1, m2, d1, d2, h1, h2, mi1, mi2, s1, s2]++msecStr++tzStr
@@ -348,8 +348,8 @@ putInteger i = B.pack $ bytesOfInt i
 
 putBitString :: BitArray -> ByteString
 putBitString (BitArray n bits) =
-	B.concat [B.singleton (fromIntegral i),bits]
-	where i = (8 - (n `mod` 8)) .&. 0x7
+    B.concat [B.singleton (fromIntegral i),bits]
+  where i = (8 - (n `mod` 8)) .&. 0x7
 
 putString :: ByteString -> ByteString
 putString l = l
@@ -357,9 +357,9 @@ putString l = l
 {- no enforce check that oid1 is between [0..2] and oid2 is between [0..39] -}
 putOID :: [Integer] -> ByteString
 putOID oids = B.cons eoidclass subeoids
-	where
-		(oid1:oid2:suboids) = oids
-		eoidclass           = fromIntegral (oid1 * 40 + oid2)
-		encode x | x == 0    = B.singleton 0
-		       	 | otherwise = putVarEncodingIntegral x
-		subeoids  = B.concat $ map encode suboids
+  where
+        (oid1:oid2:suboids) = oids
+        eoidclass           = fromIntegral (oid1 * 40 + oid2)
+        encode x | x == 0    = B.singleton 0
+                 | otherwise = putVarEncodingIntegral x
+        subeoids  = B.concat $ map encode suboids
