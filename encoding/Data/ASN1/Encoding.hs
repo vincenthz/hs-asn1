@@ -37,7 +37,7 @@ class ASN1DecodingRepr a where
 class ASN1Encoding a where
     -- | encode a stream into a lazy bytestring
     encodeASN1 :: a -> [ASN1] -> L.ByteString
-   
+
 -- | decode a strict bytestring into an ASN1 stream
 decodeASN1' :: ASN1Decoding a => a -> B.ByteString -> Either ASN1Error [ASN1]
 decodeASN1' encoding bs = decodeASN1 encoding $ L.fromChunks [bs]
