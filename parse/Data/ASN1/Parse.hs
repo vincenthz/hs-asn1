@@ -39,8 +39,15 @@ runParseASN1State f s =
                 (Right r, l)  -> Right (r,l)
 
 -- | run the parse monad over a stream and returns the result.
+--
+-- If there's still some asn1 object in the state after calling f,
+-- an error will be raised.
 runParseASN1 :: ParseASN1 a -> [ASN1] -> Either String a
-runParseASN1 f s = either Left (Right . fst) $ runParseASN1State f s
+runParseASN1 f s =
+    case runParseASN1State f s of
+        Left err      -> Left err
+        Right (o, []) -> Right o
+        Right (_, er) -> throwError ("runParseASN1: remaining state " ++ show er)
 
 -- | get next object
 getObject :: ASN1Object a => ParseASN1 a
