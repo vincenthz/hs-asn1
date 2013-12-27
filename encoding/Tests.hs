@@ -102,8 +102,8 @@ instance Arbitrary T.Text where
 instance Arbitrary BitArray where
         arbitrary = do
                 bs <- arbitrary
-                --w  <- choose (0,7) :: Gen Int
-                return $ toBitArray bs 0
+                w  <- choose (0,7) :: Gen Int
+                return $ toBitArray bs w
 
 instance Arbitrary Day where
     arbitrary = do
