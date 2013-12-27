@@ -110,7 +110,7 @@ getNextContainerMaybe ty = do
                                             put l2 >> return (Just l1)
                       | otherwise     -> return Nothing
 
--- | just like onNextContainer, except it doens't throw an error if the container doesn't exists.
+-- | just like onNextContainer, except it doesn't throw an error if the container doesn't exists.
 onNextContainerMaybe :: ASN1ConstructionType -> ParseASN1 a -> ParseASN1 (Maybe a)
 onNextContainerMaybe ty f = do
         n <- getNextContainerMaybe ty
