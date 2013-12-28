@@ -32,6 +32,8 @@ data BitArrayOutOfBound = BitArrayOutOfBound Word64
 instance Exception BitArrayOutOfBound
 
 -- | represent a bitarray / bitmap
+--
+-- the memory representation start at bit 0
 data BitArray = BitArray Word64 ByteString
     deriving (Show,Eq)
 
