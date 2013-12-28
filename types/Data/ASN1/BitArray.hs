@@ -59,7 +59,7 @@ bitArraySetBitValue (BitArray l d) n v
         let (before,after) = B.splitAt (fromIntegral offset) d in
         -- array bound check before prevent fromJust from failing.
         let (w,remaining) = fromJust $ B.uncons after in
-        BitArray l (before `B.append` (setter w (fromIntegral bitn) `B.cons` remaining))
+        BitArray l (before `B.append` (setter w (7-fromIntegral bitn) `B.cons` remaining))
   where
         (offset, bitn) = n `divMod` 8
         setter = if v then setBit else clearBit
