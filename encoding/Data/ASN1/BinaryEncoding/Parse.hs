@@ -43,6 +43,11 @@ data ParseExpect = ExpectHeader (Maybe (B.ByteString -> Result ASN1Header))
 type ParsePosition = Word64
 
 -- | represent the parsing state of an ASN1 stream.
+--
+-- * the stack of constructed elements.
+-- * the next expected type.
+-- * the position in the stream.
+--
 data ParseState = ParseState [ConstructionEndAt] ParseExpect ParsePosition
 
 -- | create a new empty parse state. position is 0
