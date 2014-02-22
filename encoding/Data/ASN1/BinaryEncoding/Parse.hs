@@ -101,7 +101,7 @@ runParseState = loop
                      Partial f              -> Right (([], ParseState stackEnd (ExpectHeader $ Just f) pos), B.empty)
                      Done hdr nPos remBytes
                         | isEOC hdr -> case stackEnd of
-                                           []                  -> Left StreamUnexpectedEOC
+                                           []                  -> Right (([], ParseState [] (ExpectHeader Nothing) nPos), remBytes)
                                            Just _:_            -> Left StreamUnexpectedEOC
                                            Nothing:newStackEnd -> Right ( ( [ConstructionEnd]
                                                                           , ParseState newStackEnd (ExpectHeader Nothing) nPos)
