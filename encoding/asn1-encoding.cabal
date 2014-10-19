@@ -30,8 +30,8 @@ Library
   Build-Depends:     base >= 3 && < 5
                    , bytestring
                    , mtl
-                   , time
-                   , asn1-types >= 0.2.1 && < 0.3
+                   , hourglass >= 0.2.6
+                   , asn1-types >= 0.3.0 && < 0.4
   ghc-options:       -Wall -fwarn-tabs
   Default-Language:  Haskell2010
 
@@ -44,10 +44,10 @@ Test-Suite tests-asn1-encoding
                    , text
                    , mtl
                    , tasty
-                   , tasty-quickcheck >= 0.2
+                   , tasty-quickcheck
                    , asn1-types
                    , asn1-encoding
-                   , time
+                   , hourglass
   ghc-options:       -Wall -fno-warn-orphans -fno-warn-missing-signatures
   Default-Language:  Haskell2010
 

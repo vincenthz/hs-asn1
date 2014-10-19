@@ -52,11 +52,10 @@ import Data.Bits
 import Data.Word
 import Data.List (unfoldr)
 import Data.ByteString (ByteString)
-import Data.Char (ord)
+import Data.Char (ord, isDigit)
 import qualified Data.ByteString as B
-import Data.Time.Calendar
-import Data.Time.Clock
-import Data.Time.LocalTime
+import qualified Data.ByteString.Char8 as BC
+import Data.Hourglass
 import Control.Applicative
 import Control.Arrow (first)
 
@@ -260,88 +259,80 @@ getOID s = Right $ OID $ (fromIntegral (x `div` 40) : fromIntegral (x `mod` 40) 
             where (ys, zs) = spanSubOIDbound as
 
 getTime :: ASN1TimeType -> ByteString -> Either ASN1Error ASN1
-getTime timeType (B.unpack -> b) = Right $ ASN1Time timeType (UTCTime cDay cDiffTime) tz
-    where
-          cDay      = fromGregorian year (fromIntegral month) (fromIntegral day)
-          cDiffTime = secondsToDiffTime (hour * 3600 + minute * 60 + sec) +
-                      picosecondsToDiffTime msec --picosecondsToDiffTime (msec * )
-          (year, b2)   = case timeType of
-                             TimeUTC         -> first ((1900 +) . centurize . toInt) $ splitAt 2 b
-                             TimeGeneralized -> first toInt $ splitAt 4 b
-          (month, b3)  = first toInt $ splitAt 2 b2
-          (day, b4)    = first toInt $ splitAt 2 b3
-          (hour, b5)   = first toInt $ splitAt 2 b4
-          (minute, b6) = first toInt $ splitAt 2 b5
-          (sec, b7)    = first toInt $ splitAt 2 b6
-          (msec, b8)   = case b7 of -- parse .[0-9]
-                            0x2e:b7' -> first toPico $ spanToLength 3 (\c -> fromIntegral c >= ord '0' && fromIntegral c <= ord '9') b7'
-                            _        -> (0,b7)
-          (tz, _)      = case b8 of
-                            0x5a:b8' -> (Just utc, b8') -- zulu
-                            0x2b:b8' -> (Just undefined, b8') -- +
-                            0x2d:b8' -> (Just undefined, b8') -- -
-                            _        -> (Nothing, b8)
+getTime timeType bs
+    | hasNonASCII bs = decodingError "contains non ASCII characters"
+    | otherwise      =
+        case timeParseE format (BC.unpack bs) of -- BC.unpack is safe as we check ASCIIness first
+            Left _  -> decodingError ("cannot convert string " ++ BC.unpack bs)
+            Right r ->
+                case parseTimezone $ parseMs $ first adjustUTC $ r of
+                    Left err        -> decodingError err
+                    Right (dt', tz) -> Right $ ASN1Time timeType dt' tz
+  where
+        adjustUTC dt@(DateTime (Date y m d) tod)
+            | timeType == TimeGeneralized = dt
+            | y > 2050                    = DateTime (Date (y - 100) m d) tod
+            | otherwise                   = dt
+        format | timeType == TimeGeneralized = 'Y':'Y':baseFormat
+               | otherwise                   = baseFormat
+        baseFormat = "YYMMDDHMIS"
 
-          spanToLength :: Int -> (Word8 -> Bool) -> [Word8] -> ([Word8], [Word8])
-          spanToLength len p l = loop 0 l
-            where loop i z
-                     | i >= len  = ([], z)
-                     | otherwise = case z of
-                                        []   -> ([], [])
-                                        x:xs -> if p x
-                                                    then let (r1,r2) = loop (i+1) xs
-                                                          in (x:r1, r2)
-                                                    else ([], z)
+        parseMs (dt,s) =
+            case s of
+                '.':s' -> let (ns, r) = first toNano $ spanToLength 3 isDigit s'
+                           in (dt { dtTime = (dtTime dt) { todNSec = ns } }, r)
+                _      -> (dt,s)
+        parseTimezone (dt,s) =
+            case s of
+                '+':s' -> Right (dt, parseTimezoneFormat id s')
+                '-':s' -> Right (dt, parseTimezoneFormat ((-1) *) s')
+                'Z':[] -> Right (dt, Just timezone_UTC)
+                ""     -> Right (dt, Nothing)
+                _      -> Left ("unknown timezone format: " ++ s)
 
-          toPico :: [Word8] -> Integer
-          toPico l = toInt l * order * 1000000000
-            where len   = length l
-                  order = case len of
+        parseTimezoneFormat transform s
+            | length s == 4  = Just $ toTz $ toInt $ fst $ spanToLength 4 isDigit s
+            | otherwise      = Nothing
+          where toTz z = let (h,m) = z `divMod` 100 in TimezoneOffset $ transform (h * 60 + m)
+
+        toNano :: String -> NanoSeconds
+        toNano l = fromIntegral (toInt l * order * 1000000)
+          where len   = length l
+                order = case len of
                             1 -> 100
                             2 -> 10
                             3 -> 1
                             _ -> 1
 
-          toInt :: [Word8] -> Integer
-          toInt         = foldl (\acc w -> acc * 10 + fromIntegral (fromIntegral w - ord '0')) 0
+        spanToLength :: Int -> (Char -> Bool) -> String -> (String, String)
+        spanToLength len p l = loop 0 l
+          where loop i z
+                    | i >= len  = ([], z)
+                    | otherwise = case z of
+                                    []   -> ([], [])
+                                    x:xs -> if p x
+                                                then let (r1,r2) = loop (i+1) xs
+                                                      in (x:r1, r2)
+                                                else ([], z)
 
-          centurize v
-            | v <= 50   = v + 100
-            | otherwise = v
+        toInt :: String -> Int
+        toInt = foldl (\acc w -> acc * 10 + (ord w - ord '0')) 0
 
-putTime :: ASN1TimeType -> UTCTime -> Maybe TimeZone  -> ByteString
-putTime ty (UTCTime day diff) mtz = B.pack etime
+        decodingError reason = Left $ TypeDecodingFailed ("time format invalid for " ++ show timeType ++ " : " ++ reason)
+        hasNonASCII = maybe False (const True) . B.find (\c -> c > 0x7f)
+
+-- FIXME need msec printed
+putTime :: ASN1TimeType -> DateTime -> Maybe TimezoneOffset -> ByteString
+putTime ty dt mtz = BC.pack etime
   where
         etime
-            | ty == TimeUTC = [y3, y4, m1, m2, d1, d2, h1, h2, mi1, mi2, s1, s2]++tzStr
-            | otherwise     = [y1, y2, y3, y4, m1, m2, d1, d2, h1, h2, mi1, mi2, s1, s2]++msecStr++tzStr
-
-        charZ = 90
-
+            | ty == TimeUTC = timePrint "YYMMDDHMIS" dt ++ tzStr
+            | otherwise     = timePrint "YYYYMMDDHMIS" dt ++ msecStr ++ tzStr
         msecStr = []
         tzStr = case mtz of
-                     Nothing                           -> []
-                     Just tz | timeZoneMinutes tz == 0 -> [charZ]
-                             | otherwise               -> asciiToWord8 $ timeZoneOffsetString tz
-
-        (y_,m,d) = toGregorian day
-        y        = fromIntegral y_
-
-        secs     = truncate (realToFrac diff :: Double) :: Integer
-
-        (h,mins) = secs `divMod` 3600
-        (mi,s)   = mins `divMod` 60
-
-        split2 n          = (fromIntegral $ n `div` 10 + ord '0', fromIntegral $ n `mod` 10 + ord '0')
-        ((y1,y2),(y3,y4)) = (split2 (y `div` 100), split2 (y `mod` 100))
-        (m1, m2)          = split2 m
-        (d1, d2)          = split2 d
-        (h1, h2)          = split2 $ fromIntegral h
-        (mi1, mi2)        = split2 $ fromIntegral mi
-        (s1, s2)          = split2 $ fromIntegral s
-
-        asciiToWord8 :: [Char] -> [Word8]
-        asciiToWord8 = map (fromIntegral . fromEnum)
+                     Nothing                      -> ""
+                     Just tz | tz == timezone_UTC -> "Z"
+                             | otherwise          -> show tz
 
 putInteger :: Integer -> ByteString
 putInteger i = B.pack $ bytesOfInt i

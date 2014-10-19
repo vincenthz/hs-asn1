@@ -13,9 +13,7 @@ import Data.ASN1.Encoding
 import Data.ASN1.Types
 import Data.ASN1.Types.Lowlevel
 
-import Data.Time.Clock
-import Data.Time.Calendar
-import Data.Time.LocalTime
+import Data.Hourglass
 
 import qualified Data.ByteString as B
 
@@ -88,25 +86,32 @@ instance Arbitrary BitArray where
                 w  <- choose (0,7) :: Gen Int
                 return $ toBitArray bs w
 
-instance Arbitrary Day where
+instance Arbitrary Date where
     arbitrary = do
         y <- choose (1951, 2050)
-        m <- choose (0, 11)
-        d <- choose (0, 31)
-        return $ fromGregorian y m d
+        m <- elements [ January .. December]
+        d <- choose (1, 30)
+        return $ normalizeDate $ Date y m d
 
-instance Arbitrary DiffTime where
+normalizeDate :: Date -> Date
+normalizeDate d = timeConvert (timeConvert d :: Elapsed)
+
+instance Arbitrary TimeOfDay where
     arbitrary = do
-        h <- choose (0, 23)
-        mi <- choose (0, 59)
-        se <- choose (0, 59)
-        return $ secondsToDiffTime (h*3600+mi*60+se)
+        h    <- choose (0, 23)
+        mi   <- choose (0, 59)
+        se   <- choose (0, 59)
+        nsec <- return 0
+        return $ TimeOfDay (Hours h) (Minutes mi) (Seconds se) nsec
 
-instance Arbitrary UTCTime where
-    arbitrary = UTCTime <$> arbitrary <*> arbitrary
+instance Arbitrary DateTime where
+    arbitrary = DateTime <$> arbitrary <*> arbitrary
 
-instance Arbitrary TimeZone where
-    arbitrary = return $ utc
+instance Arbitrary TimezoneOffset where
+    arbitrary = elements [ timezone_UTC, TimezoneOffset 60, TimezoneOffset 120, TimezoneOffset (-360) ]
+
+instance Arbitrary Elapsed where
+    arbitrary = Elapsed . Seconds <$> arbitrary
 
 instance Arbitrary ASN1TimeType where
     arbitrary = elements [TimeUTC, TimeGeneralized]
