@@ -1,13 +1,9 @@
-import Test.QuickCheck
-import Test.Framework(defaultMain, testGroup)
-import Test.Framework.Providers.QuickCheck2(testProperty)
-
-import Text.Printf
+import Test.Tasty.QuickCheck
+import Test.Tasty
 
 import Control.Applicative
 import Data.ASN1.Get (runGet, Result(..))
 import Data.ASN1.BitArray
-import Data.ASN1.Stream
 import Data.ASN1.Prim
 import Data.ASN1.Serialize
 import Data.ASN1.BinaryEncoding.Parse
@@ -16,21 +12,15 @@ import Data.ASN1.BinaryEncoding
 import Data.ASN1.Encoding
 import Data.ASN1.Types
 import Data.ASN1.Types.Lowlevel
-import Data.ASN1.OID
 
 import Data.Time.Clock
 import Data.Time.Calendar
 import Data.Time.LocalTime
 
-import Data.Word
-
 import qualified Data.ByteString as B
-import qualified Data.ByteString.Char8 as BC
 import qualified Data.Text.Lazy as T
 
 import Control.Monad
-import Control.Monad.Identity
-import System.IO
 
 instance Arbitrary ASN1Class where
         arbitrary = elements [ Universal, Application, Context, Private ]
@@ -211,4 +201,4 @@ marshallingTests = testGroup "Marshalling"
     , testProperty "DER"    prop_asn1_der_marshalling_id
     ]
 
-main = defaultMain [marshallingTests]
+main = defaultMain $ testGroup "asn1-encoding" [marshallingTests]
