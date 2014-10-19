@@ -16,7 +16,7 @@ Homepage:            http://github.com/vincenthz/hs-asn1-types
 Library
   Build-Depends:     base >= 3 && < 5
                    , bytestring
-                   , time
+                   , hourglass
 
   Exposed-modules:   Data.ASN1.BitArray
                      Data.ASN1.OID

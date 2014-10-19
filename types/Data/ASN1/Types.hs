@@ -20,8 +20,7 @@ module Data.ASN1.Types
     , module Data.ASN1.OID
     ) where
 
-import Data.Time.Clock (UTCTime)
-import Data.Time.LocalTime (TimeZone)
+import Data.Hourglass
 import Data.ASN1.BitArray
 import Data.ASN1.OID
 import Data.ASN1.Types.Lowlevel
@@ -50,7 +49,7 @@ data ASN1 =
     | Real Double
     | Enumerated Integer
     | ASN1String ASN1CharacterString
-    | ASN1Time ASN1TimeType UTCTime (Maybe TimeZone)
+    | ASN1Time ASN1TimeType DateTime (Maybe TimezoneOffset)
     | Other ASN1Class ASN1Tag ByteString
     | Start ASN1ConstructionType
     | End   ASN1ConstructionType
