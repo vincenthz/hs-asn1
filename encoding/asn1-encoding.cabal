@@ -29,7 +29,6 @@ Library
                      Data.ASN1.Get
   Build-Depends:     base >= 3 && < 5
                    , bytestring
-                   , text >= 0.11
                    , mtl
                    , time
                    , asn1-types >= 0.2.1 && < 0.3

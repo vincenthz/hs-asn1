@@ -18,7 +18,6 @@ import Data.Time.Calendar
 import Data.Time.LocalTime
 
 import qualified Data.ByteString as B
-import qualified Data.Text.Lazy as T
 
 import Control.Monad
 
@@ -82,12 +81,6 @@ instance Arbitrary B.ByteString where
         arbitrary = do
                 len <- choose (0, 529) :: Gen Int
                 arbitraryBSsized len
-
-instance Arbitrary T.Text where
-        arbitrary = do
-                len <- choose (0, 529) :: Gen Int
-                ws <- replicateM len arbitrary
-                return $ T.pack ws
 
 instance Arbitrary BitArray where
         arbitrary = do
