@@ -94,7 +94,11 @@ instance Arbitrary Date where
         return $ normalizeDate $ Date y m d
 
 normalizeDate :: Date -> Date
-normalizeDate d = timeConvert (timeConvert d :: Elapsed)
+normalizeDate origDate
+    | y < 1951  = normalizeDate (Date (y + 50) m d)
+    | otherwise = normalizedDate
+  where
+    normalizedDate@(Date y m d) = timeConvert (timeConvert origDate :: Elapsed)
 
 instance Arbitrary TimeOfDay where
     arbitrary = do
