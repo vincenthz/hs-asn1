@@ -58,4 +58,5 @@ Executable           Tests
 
 source-repository head
   type:     git
-  location: git://github.com/vincenthz/hs-asn1-data
+  location: https://github.com/vincenthz/hs-asn1-data
+  subdir:   data
