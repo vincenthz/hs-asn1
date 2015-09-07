@@ -263,16 +263,22 @@ getTime timeType bs
     | hasNonASCII bs = decodingError "contains non ASCII characters"
     | otherwise      =
         case timeParseE format (BC.unpack bs) of -- BC.unpack is safe as we check ASCIIness first
-            Left _  -> decodingError ("cannot convert string " ++ BC.unpack bs)
-            Right r ->
-                case parseTimezone $ parseMs $ first adjustUTC $ r of
-                    Left err        -> decodingError err
-                    Right (dt', tz) -> Right $ ASN1Time timeType dt' tz
+            Left _  ->
+                case timeParseE formatNoSeconds (BC.unpack bs) of
+                    Left _  -> decodingError ("cannot convert string " ++ BC.unpack bs)
+                    Right r -> parseRemaining r
+            Right r -> parseRemaining r
   where
+        parseRemaining r =
+            case parseTimezone $ parseMs $ first adjustUTC r of
+                Left err        -> decodingError err
+                Right (dt', tz) -> Right $ ASN1Time timeType dt' tz
+
         adjustUTC dt@(DateTime (Date y m d) tod)
             | timeType == TimeGeneralized = dt
             | y > 2050                    = DateTime (Date (y - 100) m d) tod
             | otherwise                   = dt
+        formatNoSeconds = init format
         format | timeType == TimeGeneralized = 'Y':'Y':baseFormat
                | otherwise                   = baseFormat
         baseFormat = "YYMMDDHMIS"
