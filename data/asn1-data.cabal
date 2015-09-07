@@ -12,7 +12,7 @@ Build-Type:          Simple
 Category:            Data
 stability:           experimental
 Cabal-Version:       >=1.6
-Homepage:            http://github.com/vincenthz/hs-asn1-data
+Homepage:            https://github.com/vincenthz/hs-asn1/tree/master/data
 data-files:          README, TODO
 
 
