@@ -7,7 +7,6 @@
 --
 -- A parser combinator for ASN1 Stream.
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE CPP #-}
 module Data.ASN1.Parse
     ( ParseASN1
     -- * run
@@ -27,30 +26,42 @@ module Data.ASN1.Parse
 
 import Data.ASN1.Types
 import Data.ASN1.Stream
-import Control.Monad.State
 import Control.Applicative (Applicative, (<$>))
+import Control.Arrow (first)
+import Control.Monad (liftM2)
 
-#if MIN_VERSION_mtl(2,2,1)
-import Control.Monad.Except
-runErrT :: ExceptT e m a -> m (Either e a)
-runErrT = runExceptT
-type ErrT = ExceptT
-#else
-import Control.Monad.Error
-runErrT = runErrorT
-type ErrT = ErrorT
-#endif
+newtype ParseASN1 a = P { runP :: [ASN1] -> Either String (a, [ASN1]) }
 
--- | Parse ASN1 Monad
-newtype ParseASN1 a = P { runP :: ErrT String (State [ASN1]) a }
-    deriving (Functor, Applicative, Monad, MonadError String, MonadState [ASN1])
+instance Functor ParseASN1 where
+    fmap f m = P (either Left (Right . first f) . runP m)
+instance Applicative ParseASN1 where
+    pure a = P $ \s -> Right (a, s)
+    (<*>) mf ma = P $ \s ->
+        case runP mf s of
+            Left err      -> Left err
+            Right (f, s2) ->
+                case runP ma s2 of
+                    Left err      -> Left err
+                    Right (a, s3) -> Right (f a, s3)
+instance Monad ParseASN1 where
+    return a    = pure a
+    (>>=) m1 m2 = P $ \s ->
+        case runP m1 s of
+            Left err      -> Left err
+            Right (a, s2) -> runP (m2 a) s2
+
+get :: ParseASN1 [ASN1]
+get = P $ \stream -> Right (stream, stream)
+
+put :: [ASN1] -> ParseASN1 ()
+put stream = P $ \_ -> Right ((), stream)
+
+throwError :: String -> ParseASN1 a
+throwError s = P $ \_ -> Left s
 
 -- | run the parse monad over a stream and returns the result and the remaining ASN1 Stream.
 runParseASN1State :: ParseASN1 a -> [ASN1] -> Either String (a,[ASN1])
-runParseASN1State f s =
-    case runState (runErrT (runP f)) s of
-        (Left err, _) -> Left err
-        (Right r, l)  -> Right (r,l)
+runParseASN1State f s = runP f s
 
 -- | run the parse monad over a stream and returns the result.
 --
@@ -58,10 +69,10 @@ runParseASN1State f s =
 -- an error will be raised.
 runParseASN1 :: ParseASN1 a -> [ASN1] -> Either String a
 runParseASN1 f s =
-    case runParseASN1State f s of
+    case runP f s of
         Left err      -> Left err
         Right (o, []) -> Right o
-        Right (_, er) -> throwError ("runParseASN1: remaining state " ++ show er)
+        Right (_, er) -> Left ("runParseASN1: remaining state " ++ show er)
 
 -- | get next object
 getObject :: ASN1Object a => ParseASN1 a

@@ -16,10 +16,8 @@ Homepage:            https://github.com/vincenthz/hs-asn1
 Library
   Build-Depends:     base >= 3 && < 5
                    , bytestring
-                   , mtl
                    , asn1-types >= 0.3 && < 0.4
                    , asn1-encoding >= 0.9
-
   Exposed-modules:   Data.ASN1.Parse
   ghc-options:       -Wall
 
