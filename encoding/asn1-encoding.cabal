@@ -29,7 +29,6 @@ Library
                      Data.ASN1.Get
   Build-Depends:     base >= 3 && < 5
                    , bytestring
-                   , mtl
                    , hourglass >= 0.2.6
                    , asn1-types >= 0.3.0 && < 0.4
   ghc-options:       -Wall -fwarn-tabs
