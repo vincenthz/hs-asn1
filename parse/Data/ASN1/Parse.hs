@@ -12,6 +12,7 @@ module Data.ASN1.Parse
     -- * run
     , runParseASN1State
     , runParseASN1
+    , throwParseError
     -- * combinators
     , onNextContainer
     , onNextContainerMaybe
@@ -56,8 +57,9 @@ get = P $ \stream -> Right (stream, stream)
 put :: [ASN1] -> ParseASN1 ()
 put stream = P $ \_ -> Right ((), stream)
 
-throwError :: String -> ParseASN1 a
-throwError s = P $ \_ -> Left s
+-- | throw a parse error
+throwParseError :: String -> ParseASN1 a
+throwParseError s = P $ \_ -> Left s
 
 -- | run the parse monad over a stream and returns the result and the remaining ASN1 Stream.
 runParseASN1State :: ParseASN1 a -> [ASN1] -> Either String (a,[ASN1])
@@ -79,7 +81,7 @@ getObject :: ASN1Object a => ParseASN1 a
 getObject = do
     l <- get
     case fromASN1 l of
-        Left err     -> throwError err
+        Left err     -> throwParseError err
         Right (a,l2) -> put l2 >> return a
 
 -- | get next element from the stream
@@ -87,7 +89,7 @@ getNext :: ParseASN1 ASN1
 getNext = do
     list <- get
     case list of
-        []    -> throwError "empty"
+        []    -> throwParseError "empty"
         (h:l) -> put l >> return h
 
 -- | get many elements until there's nothing left
@@ -115,15 +117,15 @@ getNextContainer :: ASN1ConstructionType -> ParseASN1 [ASN1]
 getNextContainer ty = do
     list <- get
     case list of
-        []                    -> throwError "empty"
+        []                    -> throwParseError "empty"
         (h:l) | h == Start ty -> do let (l1, l2) = getConstructedEnd 0 l
                                     put l2 >> return l1
-              | otherwise     -> throwError "not an expected container"
+              | otherwise     -> throwParseError "not an expected container"
 
 
 -- | run a function of the next elements of a container of specified type
 onNextContainer :: ASN1ConstructionType -> ParseASN1 a -> ParseASN1 a
-onNextContainer ty f = getNextContainer ty >>= either throwError return . runParseASN1 f
+onNextContainer ty f = getNextContainer ty >>= either throwParseError return . runParseASN1 f
 
 -- | just like getNextContainer, except it doesn't throw an error if the container doesn't exists.
 getNextContainerMaybe :: ASN1ConstructionType -> ParseASN1 (Maybe [ASN1])
@@ -140,7 +142,7 @@ onNextContainerMaybe :: ASN1ConstructionType -> ParseASN1 a -> ParseASN1 (Maybe 
 onNextContainerMaybe ty f = do
     n <- getNextContainerMaybe ty
     case n of
-        Just l  -> either throwError (return . Just) $ runParseASN1 f l
+        Just l  -> either throwParseError (return . Just) $ runParseASN1 f l
         Nothing -> return Nothing
 
 -- | returns if there's more elements in the stream.
