@@ -27,7 +27,7 @@ module Data.ASN1.Parse
 
 import Data.ASN1.Types
 import Data.ASN1.Stream
-import Control.Applicative (Applicative, (<$>))
+import Control.Applicative
 import Control.Arrow (first)
 import Control.Monad (liftM2)
 
