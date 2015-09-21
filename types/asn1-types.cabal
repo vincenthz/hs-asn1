@@ -16,10 +16,12 @@ Homepage:            http://github.com/vincenthz/hs-asn1-types
 Library
   Build-Depends:     base >= 3 && < 5
                    , bytestring
+                   , memory
                    , hourglass
 
   Exposed-modules:   Data.ASN1.BitArray
                      Data.ASN1.OID
+                     Data.ASN1.Pretty
                      Data.ASN1.Types
                      Data.ASN1.Types.String
                      Data.ASN1.Types.Lowlevel
