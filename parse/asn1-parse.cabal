@@ -1,5 +1,5 @@
 Name:                asn1-parse
-Version:             0.9.3
+Version:             0.9.4
 Description:         Simple monadic parser for ASN1 stream types, when ASN1 pattern matching is not convenient.
 License:             BSD3
 License-file:        LICENSE
