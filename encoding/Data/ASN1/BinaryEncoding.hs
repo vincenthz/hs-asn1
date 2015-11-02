@@ -13,6 +13,8 @@ module Data.ASN1.BinaryEncoding
     , DER(..)
     ) where
 
+import Control.Monad.Catch
+import Control.Monad.State
 import Data.ASN1.Stream
 import Data.ASN1.Types
 import Data.ASN1.Types.Lowlevel
@@ -21,7 +23,10 @@ import Data.ASN1.Encoding
 import Data.ASN1.BinaryEncoding.Parse
 import Data.ASN1.BinaryEncoding.Writer
 import Data.ASN1.Prim
+import Data.Conduit
 import qualified Control.Exception as E
+import qualified Data.Conduit.Lift as C
+import qualified Data.Conduit.List as C
 
 -- | Basic Encoding Rules (BER)
 data BER = BER
@@ -44,27 +49,49 @@ instance ASN1Decoding DER where
 instance ASN1Encoding DER where
     encodeASN1 _ l = toLazyByteString $ encodeToRaw l
 
+instance ASN1DecodingReprConduit DER where
+  decodeASN1ReprConduit _ = parseConduit =$= decodeEventASN1ReprConduit checkDER
+
+instance ASN1DecodingConduit DER where
+  decodeASN1Conduit _ = parseConduit =$= decodeEventASN1ReprConduit checkDER =$= C.map fst
+
 decodeConstruction :: ASN1Header -> ASN1ConstructionType
 decodeConstruction (ASN1Header Universal 0x10 _ _) = Sequence
 decodeConstruction (ASN1Header Universal 0x11 _ _) = Set
 decodeConstruction (ASN1Header c t _ _)            = Container c t
 
+decodeEventASN1ReprConduit :: MonadThrow m => (ASN1Header -> Maybe ASN1Error) -> Conduit ASN1Event m ASN1Repr
+decodeEventASN1ReprConduit checkHeader = C.evalStateC [] . awaitForever $ \ev -> do
+  st <- lift get
+  next <- await
+  case (ev, next) of
+    (h@(Header hdr@(ASN1Header _ _ True _)), Just ConstructionBegin) ->
+      let ctype = decodeConstruction hdr in
+      case checkHeader hdr of
+        Nothing -> do
+          yield (Start ctype, [h, ConstructionBegin])
+          lift $ put (ctype:st)
+        Just err -> throwM err
+    (h@(Header hdr@(ASN1Header _ _ False _)), Just (p@(Primitive prim))) ->
+      case checkHeader hdr of
+        Nothing -> case decodePrimitive hdr prim of
+          Left err -> throwM err
+          Right obj -> yield (obj, [h, p])
+        Just err -> throwM err
+    (ConstructionEnd, _) -> do
+      ctype <- lift $ case st of
+        (x:xs) -> put xs >> return x
+        _ -> throwM $ StreamUnexpectedSituation (show ConstructionEnd)
+      yield (End ctype, [ConstructionEnd])
+      mapM_ leftover next
+    (x, _) ->
+      throwM $ StreamUnexpectedSituation (show x)
+
 decodeEventASN1Repr :: (ASN1Header -> Maybe ASN1Error) -> [ASN1Event] -> [ASN1Repr]
-decodeEventASN1Repr checkHeader l = loop [] l
-    where loop _ []     = []
-          loop acc (h@(Header hdr@(ASN1Header _ _ True _)):ConstructionBegin:xs) =
-                let ctype = decodeConstruction hdr in
-                case checkHeader hdr of
-                    Nothing  -> (Start ctype,[h,ConstructionBegin]) : loop (ctype:acc) xs
-                    Just err -> E.throw err
-          loop acc (h@(Header hdr@(ASN1Header _ _ False _)):p@(Primitive prim):xs) =
-                case checkHeader hdr of
-                    Nothing -> case decodePrimitive hdr prim of
-                        Left err  -> E.throw err
-                        Right obj -> (obj, [h,p]) : loop acc xs
-                    Just err -> E.throw err
-          loop (ctype:acc) (ConstructionEnd:xs) = (End ctype, [ConstructionEnd]) : loop acc xs
-          loop _ (x:_) = E.throw $ StreamUnexpectedSituation (show x)
+decodeEventASN1Repr checkHeader l =
+  case C.sourceList l =$= decodeEventASN1ReprConduit checkHeader $$ C.consume of
+    Left err -> E.throw err
+    Right x -> x
 
 -- | DER header need to be all of finite size and of minimum possible size.
 checkDER :: ASN1Header -> Maybe ASN1Error

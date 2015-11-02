@@ -18,9 +18,12 @@ module Data.ASN1.BinaryEncoding.Parse
     -- * simple parsing interfaces
     , parseLBS
     , parseBS
+    , parseConduit
     ) where
 
 import Control.Arrow (first)
+import Control.Monad.Catch
+import Control.Monad.State
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as L
@@ -31,6 +34,8 @@ import Data.ASN1.Get
 import Data.ASN1.Serialize
 import Data.Word
 import Data.Maybe (fromJust)
+import Data.Conduit
+import qualified Data.Conduit.Lift as C
 
 -- | nothing means the parser stop this construction on
 -- an ASN1 end tag, otherwise specify the position
@@ -161,3 +166,13 @@ parseBS bs = runParseState newParseState bs `mplusEither` onSuccess
     where onSuccess (evs, pstate)
                     | isParseDone pstate = Right evs
                     | otherwise          = Left ParsingPartial
+
+parseConduit :: MonadThrow m => Conduit ByteString m ASN1Event
+parseConduit = C.evalStateC newParseState . awaitForever $ \bs -> do
+  st <- lift get
+  let res = runParseState st bs
+  case res of
+    Left e -> lift $ throwM e
+    Right (evs, newSt) -> do
+      lift $ put newSt
+      mapM yield evs

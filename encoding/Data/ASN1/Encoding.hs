@@ -5,11 +5,14 @@
 -- Stability   : experimental
 -- Portability : unknown
 --
+{-# LANGUAGE RankNTypes #-}
 module Data.ASN1.Encoding
     (
     -- * generic class for decoding and encoding stream
       ASN1Decoding(..)
     , ASN1DecodingRepr(..)
+    , ASN1DecodingReprConduit (..)
+    , ASN1DecodingConduit (..)
     , ASN1Encoding(..)
     -- * strict bytestring version
     , decodeASN1'
@@ -22,6 +25,8 @@ import qualified Data.ByteString.Lazy as L
 import Data.ASN1.Stream
 import Data.ASN1.Types
 import Data.ASN1.Error
+import Control.Monad.Catch
+import Data.Conduit
 
 -- | Describe an ASN1 decoding, that transform a bytestream into an asn1stream
 class ASN1Decoding a where
@@ -37,6 +42,12 @@ class ASN1DecodingRepr a where
 class ASN1Encoding a where
     -- | encode a stream into a lazy bytestring
     encodeASN1 :: a -> [ASN1] -> L.ByteString
+
+class ASN1DecodingReprConduit a where
+  decodeASN1ReprConduit :: forall m . MonadThrow m => a -> Conduit B.ByteString m ASN1Repr
+
+class ASN1DecodingConduit a where
+  decodeASN1Conduit :: forall m . MonadThrow m => a -> Conduit B.ByteString m ASN1
 
 -- | decode a strict bytestring into an ASN1 stream
 decodeASN1' :: ASN1Decoding a => a -> B.ByteString -> Either ASN1Error [ASN1]
