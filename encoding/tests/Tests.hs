@@ -1,3 +1,4 @@
+{-# LANGUAGE ScopedTypeVariables #-}
 import Test.Tasty.QuickCheck
 import Test.Tasty
 
@@ -13,9 +14,11 @@ import Data.ASN1.Encoding
 import Data.ASN1.Types
 import Data.ASN1.Types.Lowlevel
 
+import Data.Conduit
 import Data.Hourglass
 
 import qualified Data.ByteString as B
+import qualified Data.Conduit.List as CL
 
 import Control.Monad
 
@@ -197,10 +200,32 @@ prop_asn1_der_marshalling_id v = (decodeASN1 DER . encodeASN1 DER) v `assertEq` 
                  | got /= expected = error ("got: " ++ show got ++ " expected: " ++ show expected)
                  | otherwise       = True
 
+asn1Chunks :: Gen ([B.ByteString], [ASN1])
+asn1Chunks = do
+  evs <- arbitrary
+  let whole = encodeASN1' DER evs
+  sized $ \sz ->
+    if sz == 0
+      then return ([whole], evs)
+      else
+        let loop bs = do
+              next <- choose (1, maximum [1, B.length whole `div` sz])
+              let (chunk, rest) = B.splitAt next bs
+              if B.null rest
+                then return [chunk]
+                else loop rest >>= \x -> return (chunk:x)
+        in (,) <$> loop whole <*> pure evs
+
+prop_conduit_chunks :: Property
+prop_conduit_chunks = forAll asn1Chunks $ \(chunks, asn) ->
+  let Right decoded = CL.sourceList chunks $$ decodeASN1Conduit DER =$= CL.consume
+  in  decoded == asn
+
 marshallingTests = testGroup "Marshalling"
     [ testProperty "Header" prop_header_marshalling_id
     , testProperty "Event"  prop_event_marshalling_id
     , testProperty "DER"    prop_asn1_der_marshalling_id
+    , testProperty "Conduit Chunks" prop_conduit_chunks
     ]
 
 main = defaultMain $ testGroup "asn1-encoding" [marshallingTests]
