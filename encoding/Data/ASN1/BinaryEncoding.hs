@@ -63,29 +63,30 @@ decodeConstruction (ASN1Header c t _ _)            = Container c t
 decodeEventASN1ReprConduit :: MonadThrow m => (ASN1Header -> Maybe ASN1Error) -> Conduit ASN1Event m ASN1Repr
 decodeEventASN1ReprConduit checkHeader = C.evalStateC [] . awaitForever $ \ev -> do
   st <- lift get
-  next <- await
-  case (ev, next) of
-    (h@(Header hdr@(ASN1Header _ _ True _)), Just ConstructionBegin) ->
-      let ctype = decodeConstruction hdr in
-      case checkHeader hdr of
-        Nothing -> do
-          yield (Start ctype, [h, ConstructionBegin])
-          lift $ put (ctype:st)
-        Just err -> throwM err
-    (h@(Header hdr@(ASN1Header _ _ False _)), Just (p@(Primitive prim))) ->
-      case checkHeader hdr of
-        Nothing -> case decodePrimitive hdr prim of
-          Left err -> throwM err
-          Right obj -> yield (obj, [h, p])
-        Just err -> throwM err
-    (ConstructionEnd, _) -> do
+  case ev of
+    ConstructionEnd -> do
       ctype <- lift $ case st of
         (x:xs) -> put xs >> return x
         _ -> throwM $ StreamUnexpectedSituation (show ConstructionEnd)
       yield (End ctype, [ConstructionEnd])
-      mapM_ leftover next
-    (x, _) ->
-      throwM $ StreamUnexpectedSituation (show x)
+    _ -> do
+      next <- await
+      case (ev, next) of
+        (h@(Header hdr@(ASN1Header _ _ True _)), Just ConstructionBegin) ->
+          let ctype = decodeConstruction hdr in
+          case checkHeader hdr of
+            Nothing -> do
+              yield (Start ctype, [h, ConstructionBegin])
+              lift $ put (ctype:st)
+            Just err -> throwM err
+        (h@(Header hdr@(ASN1Header _ _ False _)), Just (p@(Primitive prim))) ->
+          case checkHeader hdr of
+            Nothing -> case decodePrimitive hdr prim of
+              Left err -> throwM err
+              Right obj -> yield (obj, [h, p])
+            Just err -> throwM err
+        (x, _) ->
+          throwM $ StreamUnexpectedSituation (show x)
 
 decodeEventASN1Repr :: (ASN1Header -> Maybe ASN1Error) -> [ASN1Event] -> [ASN1Repr]
 decodeEventASN1Repr checkHeader l =
