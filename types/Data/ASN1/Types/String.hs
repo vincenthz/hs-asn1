@@ -134,7 +134,13 @@ encodeASCII = BC.pack
 decodeBMP :: ByteString -> String
 decodeBMP b
     | odd (B.length b) = error "not a valid BMP string"
-    | otherwise        = undefined
+    | otherwise        = fromUCS2 $ B.unpack b
+  where fromUCS2 [] = []
+        fromUCS2 (b0:b1:l) =
+            let v :: Word16
+                v = (fromIntegral b0 `shiftL` 8) .|. fromIntegral b1
+             in toEnum (fromIntegral v) : fromUCS2 l
+        fromUCS2 _ = error "decodeBMP: internal error"
 encodeBMP :: String -> ByteString
 encodeBMP s = B.pack $ concatMap (toUCS2 . fromEnum) s
   where toUCS2 v = [b0,b1]
@@ -144,7 +150,16 @@ encodeBMP s = B.pack $ concatMap (toUCS2 . fromEnum) s
 decodeUTF32 :: ByteString -> String
 decodeUTF32 b
     | (B.length b `mod` 4) /= 0 = error "not a valid UTF32 string"
-    | otherwise                 = undefined
+    | otherwise                 = fromUTF32 $ B.unpack b
+  where fromUTF32 (a:b:c:d:l) =
+            let v :: Word32
+                v = (fromIntegral a `shiftL` 24) .|.
+                    (fromIntegral b `shiftL` 16) .|.
+                    (fromIntegral c `shiftL` 8) .|.
+                    (fromIntegral d)
+             in toEnum (fromIntegral v) : fromUTF32 l
+        fromUTF32 [] = []
+        fromUTF32 _  = error "decodeUTF32: internal error"
 encodeUTF32 :: String -> ByteString
 encodeUTF32 s = B.pack $ concatMap (toUTF32 . fromEnum) s
   where toUTF32 v = [b0,b1,b2,b3]
