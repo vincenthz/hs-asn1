@@ -33,7 +33,6 @@ import Data.Maybe (fromMaybe)
 import Foreign
 
 import qualified Data.ByteString          as B
-import qualified Data.ByteString.Unsafe   as B
 
 -- | The result of a parse.
 data Result r = Fail String
@@ -72,7 +71,7 @@ data More = Complete
 
 -- | The Get monad is an Exception and State monad.
 newtype Get a = Get
-	{ unGet :: forall r. Input -> Buffer -> More -> Position -> Failure r -> Success a r -> Result r }
+    { unGet :: forall r. Input -> Buffer -> More -> Position -> Failure r -> Success a r -> Result r }
 
 append :: Buffer -> Buffer -> Buffer
 append l r = B.append `fmap` l <*> r
