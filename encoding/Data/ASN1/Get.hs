@@ -33,7 +33,6 @@ import Data.Maybe (fromMaybe)
 import Foreign
 
 import qualified Data.ByteString          as B
-import qualified Data.ByteString.Unsafe   as B
 
 -- | The result of a parse.
 data Result r = Fail String
@@ -185,13 +184,17 @@ getBytesCopy n = do
 
 -- | Pull @n@ bytes from the input, as a strict ByteString.
 getBytes :: Int -> Get B.ByteString
-getBytes n = do
-     s <- ensure n
-     put (fromIntegral n) $ B.unsafeDrop n s
-     return $ B.unsafeTake n s
+getBytes n
+  | n <= 0    = return B.empty
+  | otherwise = do
+    s <- ensure n
+    let (b1, b2) = B.splitAt n s
+    put (fromIntegral n) b2
+    return b1
 
 getWord8 :: Get Word8
 getWord8 = do
-     s <- ensure 1
-     put 1 $ B.unsafeTail s
-     return $ B.unsafeHead s
+    s <- ensure 1
+    case B.uncons s of
+        Nothing     -> error "getWord8: ensure internal error"
+        Just (h,b2) -> put 1 b2 >> return h
