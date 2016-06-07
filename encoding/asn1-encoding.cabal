@@ -44,6 +44,7 @@ Test-Suite tests-asn1-encoding
                    , mtl
                    , tasty
                    , tasty-quickcheck
+                   , tasty-hunit
                    , asn1-types
                    , asn1-encoding
                    , hourglass

@@ -1,7 +1,10 @@
+{-# LANGUAGE OverloadedStrings #-}
+import Test.Tasty.HUnit
 import Test.Tasty.QuickCheck
 import Test.Tasty
 
 import Control.Applicative
+import Data.ASN1.Error
 import Data.ASN1.Get (runGet, Result(..))
 import Data.ASN1.BitArray
 import Data.ASN1.Prim
@@ -197,10 +200,21 @@ prop_asn1_der_marshalling_id v = (decodeASN1 DER . encodeASN1 DER) v `assertEq` 
                  | got /= expected = error ("got: " ++ show got ++ " expected: " ++ show expected)
                  | otherwise       = True
 
+negativeLengthHdr :: B.ByteString
+negativeLengthHdr =
+  "0\157\&000000000000000000000\252\&0000000\146\&0000000000000000000000000000000000000000000000000\STX\175\&000000000000000000000000000000000000000\222\&00000000"
+
+negativeLengthFails :: TestTree
+negativeLengthFails = testCase "negativeLengthFails" $
+  case decodeASN1' DER negativeLengthHdr of
+    Left (ParsingHeaderFail _) -> return ()
+    _                          ->
+      assertFailure "Parsing header with invalid length didn't throw an error"
+
 marshallingTests = testGroup "Marshalling"
     [ testProperty "Header" prop_header_marshalling_id
     , testProperty "Event"  prop_event_marshalling_id
     , testProperty "DER"    prop_asn1_der_marshalling_id
     ]
 
-main = defaultMain $ testGroup "asn1-encoding" [marshallingTests]
+main = defaultMain $ testGroup "asn1-encoding" [marshallingTests,negativeLengthFails]
