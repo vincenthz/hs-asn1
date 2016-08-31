@@ -1,0 +1,6 @@
+resolver: lts-6.13
+packages:
+  - types
+  - data
+  - encoding
+  - parse

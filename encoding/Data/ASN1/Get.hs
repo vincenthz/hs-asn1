@@ -98,12 +98,15 @@ instance Alternative Get where
 -- Definition directly from Control.Monad.State.Strict
 instance Monad Get where
     return a = Get $ \ s0 b0 m0 p0 _ ks -> ks s0 b0 m0 p0 a
+    {-# INLINE return #-}
 
     m >>= g  = Get $ \s0 b0 m0 p0 kf ks ->
         let ks' s1 b1 m1 p1 a = unGet (g a) s1 b1 m1 p1 kf ks
          in unGet m s0 b0 m0 p0 kf ks'
+    {-# INLINE (>>=) #-}
 
     fail     = failDesc
+    {-# INLINE fail #-}
 
 instance MonadPlus Get where
     mzero     = failDesc "mzero"

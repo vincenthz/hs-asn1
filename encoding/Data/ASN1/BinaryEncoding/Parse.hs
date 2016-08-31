@@ -62,11 +62,6 @@ asn1LengthToConst (LenShort n)  = Just $ fromIntegral n
 asn1LengthToConst (LenLong _ n) = Just $ fromIntegral n
 asn1LengthToConst LenIndefinite = Nothing
 
--- in the future, drop this for the `mplus` with Either.
-mplusEither :: Either b a -> (a -> Either b c) -> Either b c
-mplusEither (Left e) _  = Left e
-mplusEither (Right e) f = f e
-
 -- | Represent the events and state thus far.
 type ParseCursor = ([ASN1Event], ParseState)
 
@@ -79,10 +74,10 @@ runParseState :: ParseState -- ^ parser state
 runParseState = loop
      where
            loop iniState bs
-                | B.null bs = terminateAugment (([], iniState), bs) `mplusEither` (Right . fst)
-                | otherwise = go iniState bs `mplusEither` terminateAugment
-                                             `mplusEither` \((evs, newState), nbs) -> loop newState nbs
-                                             `mplusEither` (Right . first (evs ++))
+                | B.null bs = terminateAugment (([], iniState), bs) >>= (Right . fst)
+                | otherwise = go iniState bs >>= terminateAugment
+                                             >>= \((evs, newState), nbs) -> loop newState nbs
+                                             >>= (Right . first (evs ++))
 
            terminateAugment ret@((evs, ParseState stackEnd pe pos), r) =
                 case stackEnd of
@@ -142,22 +137,22 @@ isParseDone _                                        = False
 
 -- | Parse one lazy bytestring and returns on success all ASN1 events associated.
 parseLBS :: L.ByteString -> Either ASN1Error [ASN1Event]
-parseLBS lbs = foldrEither process ([], newParseState) (L.toChunks lbs) `mplusEither` onSuccess
+parseLBS lbs = foldrEither process ([], newParseState) (L.toChunks lbs) >>= onSuccess
     where 
           onSuccess (allEvs, finalState)
                   | isParseDone finalState = Right $ concat $ reverse allEvs
                   | otherwise              = Left ParsingPartial
 
           process :: ([[ASN1Event]], ParseState) -> ByteString -> Either ASN1Error ([[ASN1Event]], ParseState)
-          process (pevs, cState) bs = runParseState cState bs `mplusEither` \(es, cState') -> Right (es : pevs, cState')
+          process (pevs, cState) bs = runParseState cState bs >>= \(es, cState') -> Right (es : pevs, cState')
 
           foldrEither :: (a -> ByteString -> Either ASN1Error a) -> a -> [ByteString] -> Either ASN1Error a
           foldrEither _ acc []     = Right acc
-          foldrEither f acc (x:xs) = f acc x `mplusEither` \nacc -> foldrEither f nacc xs
+          foldrEither f acc (x:xs) = f acc x >>= \nacc -> foldrEither f nacc xs
 
 -- | Parse one strict bytestring and returns on success all ASN1 events associated.
 parseBS :: ByteString -> Either ASN1Error [ASN1Event]
-parseBS bs = runParseState newParseState bs `mplusEither` onSuccess
+parseBS bs = runParseState newParseState bs >>= onSuccess
     where onSuccess (evs, pstate)
                     | isParseDone pstate = Right evs
                     | otherwise          = Left ParsingPartial
