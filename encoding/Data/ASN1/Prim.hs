@@ -50,7 +50,7 @@ import Data.ASN1.Error
 import Data.ASN1.Serialize
 import Data.Bits
 import Data.Word
-import Data.List (unfoldr)
+import Data.List (foldl', unfoldr)
 import Data.ByteString (ByteString)
 import Data.Char (ord, isDigit)
 import qualified Data.ByteString as B
@@ -246,7 +246,7 @@ getOID s = Right $ OID $ (fromIntegral (x `div` 40) : fromIntegral (x `mod` 40) 
         (x:xs) = B.unpack s
 
         groupOID :: [Word8] -> [Integer]
-        groupOID = map (foldl (\acc n -> (acc `shiftL` 7) + fromIntegral n) 0) . groupSubOID
+        groupOID = map (foldl' (\acc n -> (acc `shiftL` 7) + fromIntegral n) 0) . groupSubOID
 
         groupSubOIDHelper [] = Nothing
         groupSubOIDHelper l  = Just $ spanSubOIDbound l
@@ -322,7 +322,7 @@ getTime timeType bs
                                                 else ([], z)
 
         toInt :: String -> Int
-        toInt = foldl (\acc w -> acc * 10 + (ord w - ord '0')) 0
+        toInt = foldl' (\acc w -> acc * 10 + (ord w - ord '0')) 0
 
         decodingError reason = Left $ TypeDecodingFailed ("time format invalid for " ++ show timeType ++ " : " ++ reason)
         hasNonASCII = maybe False (const True) . B.find (\c -> c > 0x7f)

@@ -20,7 +20,7 @@ import qualified Data.ByteString as B
 
 {- | uintOfBytes returns the number of bytes and the unsigned integer represented by the bytes -}
 uintOfBytes :: ByteString -> (Int, Integer)
-uintOfBytes b = (B.length b, B.foldl (\acc n -> (acc `shiftL` 8) + fromIntegral n) 0 b)
+uintOfBytes b = (B.length b, B.foldl' (\acc n -> (acc `shiftL` 8) + fromIntegral n) 0 b)
 
 --bytesOfUInt i = B.unfoldr (\x -> if x == 0 then Nothing else Just (fromIntegral (x .&. 0xff), x `shiftR` 8)) i
 bytesOfUInt :: Integer -> [Word8]

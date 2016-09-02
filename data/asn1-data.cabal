@@ -26,6 +26,7 @@ Library
                    , text >= 0.11
                    , mtl
                    , cereal
+                   , dlist
 
   Exposed-modules:   Data.ASN1.BitArray
                      Data.ASN1.Types

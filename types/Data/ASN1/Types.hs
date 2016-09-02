@@ -40,17 +40,17 @@ data ASN1TimeType = TimeUTC         -- ^ ASN1 UTCTime Type: limited between 1950
 
 -- | Define high level ASN1 object.
 data ASN1 =
-      Boolean Bool
-    | IntVal  Integer
-    | BitString BitArray
-    | OctetString ByteString
+      Boolean {-# UNPACK #-} !Bool
+    | IntVal  {-# UNPACK #-} !Integer
+    | BitString !BitArray
+    | OctetString !ByteString
     | Null
     | OID  OID
-    | Real Double
-    | Enumerated Integer
+    | Real {-# UNPACK #-} !Double
+    | Enumerated {-# UNPACK #-} !Integer
     | ASN1String ASN1CharacterString
     | ASN1Time ASN1TimeType DateTime (Maybe TimezoneOffset)
-    | Other ASN1Class ASN1Tag ByteString
+    | Other ASN1Class ASN1Tag !ByteString
     | Start ASN1ConstructionType
     | End   ASN1ConstructionType
     deriving (Show, Eq)

@@ -29,6 +29,7 @@ Library
                      Data.ASN1.Get
   Build-Depends:     base >= 3 && < 5
                    , bytestring
+                   , dlist
                    , hourglass >= 0.2.6
                    , asn1-types >= 0.3.0 && < 0.4
   ghc-options:       -Wall -fwarn-tabs
@@ -40,6 +41,7 @@ Test-Suite tests-asn1-encoding
   Main-Is:           Tests.hs
   Build-depends:     base >= 3 && < 7
                    , bytestring
+                   , dlist
                    , text
                    , mtl
                    , tasty

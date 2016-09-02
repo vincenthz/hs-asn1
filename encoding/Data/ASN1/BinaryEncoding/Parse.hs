@@ -1,3 +1,4 @@
+{-# LANGUAGE BangPatterns #-}
 -- |
 -- Module      : Data.ASN1.BinaryEncoding.Parse
 -- License     : BSD-style
@@ -31,6 +32,8 @@ import Data.ASN1.Get
 import Data.ASN1.Serialize
 import Data.Word
 import Data.Maybe (fromJust)
+import qualified Data.DList as DList
+import Data.DList (DList)
 
 -- | nothing means the parser stop this construction on
 -- an ASN1 end tag, otherwise specify the position
@@ -62,13 +65,8 @@ asn1LengthToConst (LenShort n)  = Just $ fromIntegral n
 asn1LengthToConst (LenLong _ n) = Just $ fromIntegral n
 asn1LengthToConst LenIndefinite = Nothing
 
--- in the future, drop this for the `mplus` with Either.
-mplusEither :: Either b a -> (a -> Either b c) -> Either b c
-mplusEither (Left e) _  = Left e
-mplusEither (Right e) f = f e
-
 -- | Represent the events and state thus far.
-type ParseCursor = ([ASN1Event], ParseState)
+type ParseCursor = (DList ASN1Event, ParseState)
 
 -- | run incrementally the ASN1 parser on a bytestring.
 -- the result can be either an error, or on success a list
@@ -79,17 +77,17 @@ runParseState :: ParseState -- ^ parser state
 runParseState = loop
      where
            loop iniState bs
-                | B.null bs = terminateAugment (([], iniState), bs) `mplusEither` (Right . fst)
-                | otherwise = go iniState bs `mplusEither` terminateAugment
-                                             `mplusEither` \((evs, newState), nbs) -> loop newState nbs
-                                             `mplusEither` (Right . first (evs ++))
+                | B.null bs = terminateAugment ((DList.empty, iniState), bs) >>= (Right . fst)
+                | otherwise = go iniState bs >>= terminateAugment
+                                             >>= \((evs, newState), nbs) -> loop newState nbs
+                                             >>= (Right . first (DList.append evs))
 
-           terminateAugment ret@((evs, ParseState stackEnd pe pos), r) =
+           terminateAugment ret@((!evs, ParseState stackEnd pe pos), r) =
                 case stackEnd of
                     Just endPos:xs
                          | pos > endPos  -> Left StreamConstructionWrongSize
-                         | pos == endPos -> terminateAugment ((evs ++ [ConstructionEnd], ParseState xs pe pos), r)
-                         | otherwise     -> Right ret 
+                         | pos == endPos -> terminateAugment ((DList.snoc evs ConstructionEnd, ParseState xs pe pos), r)
+                         | otherwise     -> Right ret
                     _                    -> Right ret
 
            -- go get one element (either a primitive or a header) from the bytes
@@ -98,35 +96,35 @@ runParseState = loop
            go (ParseState stackEnd (ExpectHeader cont) pos) bs =
                 case runGetHeader cont pos bs of
                      Fail s                 -> Left $ ParsingHeaderFail s
-                     Partial f              -> Right (([], ParseState stackEnd (ExpectHeader $ Just f) pos), B.empty)
+                     Partial f              -> Right ((DList.empty, ParseState stackEnd (ExpectHeader $ Just f) pos), B.empty)
                      Done hdr nPos remBytes
                         | isEOC hdr -> case stackEnd of
-                                           []                  -> Right (([], ParseState [] (ExpectHeader Nothing) nPos), remBytes)
+                                           []                  -> Right ((DList.empty, ParseState [] (ExpectHeader Nothing) nPos), remBytes)
                                            Just _:_            -> Left StreamUnexpectedEOC
-                                           Nothing:newStackEnd -> Right ( ( [ConstructionEnd]
+                                           Nothing:newStackEnd -> Right ( ( DList.singleton ConstructionEnd
                                                                           , ParseState newStackEnd (ExpectHeader Nothing) nPos)
                                                                         , remBytes)
                         | otherwise -> case hdr of
                                        (ASN1Header _ _ True len)  ->
                                            let nEnd = (nPos +) `fmap` asn1LengthToConst len
-                                           in Right ( ( [Header hdr,ConstructionBegin]
+                                           in Right ( ( DList.fromList [Header hdr,ConstructionBegin]
                                                       , ParseState (nEnd:stackEnd) (ExpectHeader Nothing) nPos)
                                                     , remBytes)
                                        (ASN1Header _ _ False LenIndefinite) -> Left StreamInfinitePrimitive
                                        (ASN1Header _ _ False len) ->
                                            let pLength = fromJust $ asn1LengthToConst len
                                            in if pLength == 0
-                                                 then Right ( ( [Header hdr,Primitive B.empty]
+                                                 then Right ( ( DList.fromList [Header hdr,Primitive B.empty]
                                                               , ParseState stackEnd (ExpectHeader Nothing) nPos)
                                                             , remBytes)
-                                                 else Right ( ( [Header hdr]
+                                                 else Right ( ( DList.singleton (Header hdr)
                                                               , ParseState stackEnd (ExpectPrimitive pLength Nothing) nPos)
                                                             , remBytes)
            go (ParseState stackEnd (ExpectPrimitive len cont) pos) bs =
                 case runGetPrimitive cont len pos bs of
                      Fail _               -> error "primitive parsing failed"
-                     Partial f            -> Right (([], ParseState stackEnd (ExpectPrimitive len $ Just f) pos), B.empty)
-                     Done p nPos remBytes -> Right (([Primitive p], ParseState stackEnd (ExpectHeader Nothing) nPos), remBytes)
+                     Partial f            -> Right ((DList.empty, ParseState stackEnd (ExpectPrimitive len $ Just f) pos), B.empty)
+                     Done p nPos remBytes -> Right ((DList.singleton (Primitive p), ParseState stackEnd (ExpectHeader Nothing) nPos), remBytes)
 
            runGetHeader Nothing  = \pos -> runGetPos pos getHeader
            runGetHeader (Just f) = const f
@@ -142,22 +140,24 @@ isParseDone _                                        = False
 
 -- | Parse one lazy bytestring and returns on success all ASN1 events associated.
 parseLBS :: L.ByteString -> Either ASN1Error [ASN1Event]
-parseLBS lbs = foldrEither process ([], newParseState) (L.toChunks lbs) `mplusEither` onSuccess
-    where 
+parseLBS lbs = foldrEither process (DList.empty, newParseState) (L.toChunks lbs) >>= onSuccess
+    where
+          onSuccess :: (DList ASN1Event, ParseState) -> Either ASN1Error [ASN1Event]
           onSuccess (allEvs, finalState)
-                  | isParseDone finalState = Right $ concat $ reverse allEvs
+                  | isParseDone finalState = Right $ DList.toList $ allEvs
                   | otherwise              = Left ParsingPartial
 
-          process :: ([[ASN1Event]], ParseState) -> ByteString -> Either ASN1Error ([[ASN1Event]], ParseState)
-          process (pevs, cState) bs = runParseState cState bs `mplusEither` \(es, cState') -> Right (es : pevs, cState')
+          process :: (DList ASN1Event, ParseState) -> ByteString -> Either ASN1Error (DList ASN1Event, ParseState)
+          process (pevs, cState) bs = runParseState cState bs >>= \(es, cState') ->
+            let res = DList.append pevs es in res `seq` Right (res, cState')
 
           foldrEither :: (a -> ByteString -> Either ASN1Error a) -> a -> [ByteString] -> Either ASN1Error a
           foldrEither _ acc []     = Right acc
-          foldrEither f acc (x:xs) = f acc x `mplusEither` \nacc -> foldrEither f nacc xs
+          foldrEither f acc (x:xs) = f acc x >>= \nacc -> foldrEither f nacc xs
 
 -- | Parse one strict bytestring and returns on success all ASN1 events associated.
 parseBS :: ByteString -> Either ASN1Error [ASN1Event]
-parseBS bs = runParseState newParseState bs `mplusEither` onSuccess
+parseBS bs = runParseState newParseState bs >>= onSuccess
     where onSuccess (evs, pstate)
-                    | isParseDone pstate = Right evs
+                    | isParseDone pstate = Right (DList.toList evs)
                     | otherwise          = Left ParsingPartial

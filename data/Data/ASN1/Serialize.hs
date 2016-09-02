@@ -67,7 +67,7 @@ getLength = do
             return (LenShort l1)
     where
         {- uintbs return the unsigned int represented by the bytes -}
-        uintbs = B.foldl (\acc n -> (acc `shiftL` 8) + fromIntegral n) 0
+        uintbs = B.foldl' (\acc n -> (acc `shiftL` 8) + fromIntegral n) 0
 
 -- | putIdentifier encode an ASN1 Identifier into a marshalled value
 putHeader :: ASN1Header -> Put
