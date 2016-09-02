@@ -19,6 +19,7 @@ import Data.ByteString (ByteString)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 import Data.Bits
+import Data.List (foldl')
 import Data.Word
 
 -- a note on T61 encodings. The actual specification of a T61 character set seems
@@ -105,7 +106,7 @@ decodeUTF8 b = loop 0 $ B.unpack b
         uncont _ _ _ _ = error "invalid number of bytes for continuation"
         decodeCont :: Word8 -> [Word8] -> Char
         decodeCont iniV l
-            | all isContByte l = toEnum $ foldl (\acc v -> (acc `shiftL` 6) + fromIntegral v) (fromIntegral iniV) $ map (\v -> v .&. 0x3f) l
+            | all isContByte l = toEnum $ foldl' (\acc v -> (acc `shiftL` 6) + fromIntegral v) (fromIntegral iniV) $ map (\v -> v .&. 0x3f) l
             | otherwise        = error "continuation bytes invalid"
         isContByte v = v `testBit` 7 && v `isClear` 6
         isClear v i = not (v `testBit` i)

@@ -62,7 +62,7 @@ import Data.ASN1.Serialize
 import Data.Serialize.Put (runPut)
 import Data.Bits
 import Data.Word
-import Data.List (unfoldr)
+import Data.List (foldl', unfoldr)
 import Data.ByteString (ByteString)
 import Data.Char (ord)
 import qualified Data.ByteString as B
@@ -320,7 +320,7 @@ getOID s = Right $ OID $ (fromIntegral (x `div` 40) : fromIntegral (x `mod` 40) 
         (x:xs) = B.unpack s
 
         groupOID :: [Word8] -> [Integer]
-        groupOID = map (foldl (\acc n -> (acc `shiftL` 7) + fromIntegral n) 0) . groupSubOID
+        groupOID = map (foldl' (\acc n -> (acc `shiftL` 7) + fromIntegral n) 0) . groupSubOID
 
         groupSubOIDHelper [] = Nothing
         groupSubOIDHelper l  = Just $ spanSubOIDbound l

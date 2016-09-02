@@ -1,3 +1,4 @@
+{-# LANGUAGE BangPatterns #-}
 -- |
 -- Module      : Data.ASN1.Stream
 -- License     : BSD-style
@@ -27,13 +28,13 @@ data ASN1ConstructionType = Sequence
                           deriving (Show,Eq)
 
 -- | Define high level ASN1 object.
-data ASN1 = Boolean Bool
-          | IntVal Integer
+data ASN1 = Boolean {-# UNPACK #-} !Bool
+          | IntVal {-# UNPACK #-} !Integer
           | BitString BitArray
           | OctetString L.ByteString
           | Null
           | OID [Integer]
-          | Real Double
+          | Real {-# UNPACK #-} !Double
           | Enumerated
           | UTF8String String
           | NumericString L.ByteString
@@ -61,11 +62,17 @@ type ASN1Repr = (ASN1, [ASN1Event])
 
 getConstructedEnd :: Int -> [ASN1] -> ([ASN1],[ASN1])
 getConstructedEnd _ xs@[]                = (xs, [])
-getConstructedEnd i ((x@(Start _)):xs)   = let (yz, zs) = getConstructedEnd (i+1) xs in (x:yz,zs)
-getConstructedEnd i ((x@(End _)):xs)
+getConstructedEnd !i ((x@(Start _)):xs)   = let (yz, zs) = getConstructedEnd (i+1) xs
+                                                acc      = x:yz
+                                                in acc `seq` (acc,zs)
+getConstructedEnd !i ((x@(End _)):xs)
     | i == 0    = ([], xs)
-    | otherwise = let (ys, zs) = getConstructedEnd (i-1) xs in (x:ys,zs)
-getConstructedEnd i (x:xs)               = let (ys, zs) = getConstructedEnd i xs in (x:ys,zs)
+    | otherwise = let (ys, zs) = getConstructedEnd (i-1) xs
+                      acc      = x:ys
+                      in acc `seq` (acc,zs)
+getConstructedEnd !i (x:xs)               = let (ys, zs) = getConstructedEnd i xs
+                                                acc      = x:ys
+                                                in acc `seq` (acc,zs)
 
 getConstructedEndRepr :: [ASN1Repr] -> ([ASN1Repr],[ASN1Repr])
 getConstructedEndRepr = g
@@ -76,6 +83,12 @@ getConstructedEndRepr = g
           getEnd :: Int -> [ASN1Repr] -> ([ASN1Repr],[ASN1Repr])
           getEnd _ []                    = ([], [])
           getEnd 0 xs                    = ([], xs)
-          getEnd i ((x@(Start _, _)):xs) = let (ys, zs) = getEnd (i+1) xs in (x:ys,zs)
-          getEnd i ((x@(End _, _)):xs)   = let (ys, zs) = getEnd (i-1) xs in (x:ys,zs)
-          getEnd i (x:xs)                = let (ys, zs) = getEnd i xs in (x:ys,zs)
+          getEnd !i ((x@(Start _, _)):xs) = let (ys, zs) = getEnd (i+1) xs
+                                                acc      = x:ys
+                                                in acc `seq` (acc,zs)
+          getEnd !i ((x@(End _, _)):xs)   = let (ys, zs) = getEnd (i-1) xs
+                                                acc      = x:ys
+                                                in acc `seq` (acc,zs)
+          getEnd !i (x:xs)                = let (ys, zs) = getEnd i xs
+                                                acc      = x:ys
+                                                in acc `seq` (acc,zs)

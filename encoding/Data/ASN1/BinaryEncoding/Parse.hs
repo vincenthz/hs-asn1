@@ -1,3 +1,4 @@
+{-# LANGUAGE BangPatterns #-}
 -- |
 -- Module      : Data.ASN1.BinaryEncoding.Parse
 -- License     : BSD-style
@@ -81,7 +82,7 @@ runParseState = loop
                                              >>= \((evs, newState), nbs) -> loop newState nbs
                                              >>= (Right . first (DList.append evs))
 
-           terminateAugment ret@((evs, ParseState stackEnd pe pos), r) =
+           terminateAugment ret@((!evs, ParseState stackEnd pe pos), r) =
                 case stackEnd of
                     Just endPos:xs
                          | pos > endPos  -> Left StreamConstructionWrongSize
