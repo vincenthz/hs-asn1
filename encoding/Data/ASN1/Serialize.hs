@@ -37,7 +37,7 @@ parseFirstWord w = (cl,pc,t1)
 getTagLong :: Get ASN1Tag
 getTagLong = do
     t <- fromIntegral <$> getWord8
-    when (t == 0x80) $ error "not canonical encoding of tag"
+    when (t == 0x80) $ fail "non canonical encoding of long tag"
     if testBit t 7
         then loop (clearBit t 7)
         else return t

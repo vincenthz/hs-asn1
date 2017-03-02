@@ -124,7 +124,7 @@ runParseState = loop
                                                             , remBytes)
            go (ParseState stackEnd (ExpectPrimitive len cont) pos) bs =
                 case runGetPrimitive cont len pos bs of
-                     Fail _               -> error "primitive parsing failed"
+                     Fail _               -> Left ParsingPartial
                      Partial f            -> Right (([], ParseState stackEnd (ExpectPrimitive len $ Just f) pos), B.empty)
                      Done p nPos remBytes -> Right (([Primitive p], ParseState stackEnd (ExpectHeader Nothing) nPos), remBytes)
 

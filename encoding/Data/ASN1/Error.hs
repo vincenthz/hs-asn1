@@ -25,6 +25,7 @@ data ASN1Error = StreamUnexpectedEOC         -- ^ Unexpected EOC in the stream.
                | ParsingPartial              -- ^ Parsing is not finished, there is construction unended.
                | TypeNotImplemented String   -- ^ Decoding of a type that is not implemented. Contribution welcome.
                | TypeDecodingFailed String   -- ^ Decoding of a knowed type failed.
+               | TypePrimitiveInvalid String -- ^ Invalid primitive type
                | PolicyFailed String String -- ^ Policy failed including the name of the policy and the reason.
                deriving (Typeable, Show, Eq)
 
