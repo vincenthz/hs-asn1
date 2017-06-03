@@ -40,7 +40,6 @@ Test-Suite tests-asn1-encoding
   Main-Is:           Tests.hs
   Build-depends:     base >= 3 && < 7
                    , bytestring
-                   , text
                    , mtl
                    , tasty
                    , tasty-quickcheck
