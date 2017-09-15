@@ -160,7 +160,7 @@ instance Arbitrary ASN1 where
                 , liftM OctetString arbitrary
                 , return Null
                 , liftM OID arbitraryOID
-                --, Real Double
+                , liftM Real arbitrary
                 -- , return Enumerated
                 , ASN1String <$> arbitrary
                 , ASN1Time <$> arbitrary <*> arbitrary <*> arbitrary
