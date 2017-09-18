@@ -27,6 +27,7 @@ module Data.ASN1.Prim
     -- * marshall an ASN1 type from a val struct or a bytestring
     , getBoolean
     , getInteger
+    , getDouble
     , getBitString
     , getOctetString
     , getNull
@@ -36,6 +37,7 @@ module Data.ASN1.Prim
     -- * marshall an ASN1 type to a bytestring
     , putTime
     , putInteger
+    , putDouble
     , putBitString
     , putString
     , putOID
@@ -49,15 +51,22 @@ import Data.ASN1.Types.Lowlevel
 import Data.ASN1.Error
 import Data.ASN1.Serialize
 import Data.Bits
+import Data.Monoid
+import Data.Int
 import Data.Word
 import Data.List (unfoldr)
 import Data.ByteString (ByteString)
+import Data.ByteString.Builder (Builder)
 import Data.Char (ord, isDigit)
 import qualified Data.ByteString as B
+import qualified Data.ByteString.Builder as Builder
 import qualified Data.ByteString.Char8 as BC
+import qualified Data.ByteString.Lazy as LB
+import qualified Data.ByteString.Unsafe as B
 import Data.Hourglass
 import Control.Applicative
 import Control.Arrow (first)
+import Control.Monad
 
 encodeHeader :: Bool -> ASN1Length -> ASN1 -> ASN1Header
 encodeHeader pc len (Boolean _)                = ASN1Header Universal 0x1 pc len
@@ -99,7 +108,7 @@ encodePrimitiveData (BitString bits)    = putBitString bits
 encodePrimitiveData (OctetString b)     = putString b
 encodePrimitiveData Null                = B.empty
 encodePrimitiveData (OID oidv)          = putOID oidv
-encodePrimitiveData (Real _)            = B.empty -- not implemented
+encodePrimitiveData (Real d)            = putDouble d
 encodePrimitiveData (Enumerated i)      = putInteger $ fromIntegral i
 encodePrimitiveData (ASN1String cs)     = getCharacterStringRawData cs
 encodePrimitiveData (ASN1Time ty ti tz) = putTime ty ti tz
@@ -164,7 +173,7 @@ decodePrimitive (ASN1Header Universal 0x5 _ _) p   = getNull p
 decodePrimitive (ASN1Header Universal 0x6 _ _) p   = getOID p
 decodePrimitive (ASN1Header Universal 0x7 _ _) _   = Left $ TypeNotImplemented "Object Descriptor"
 decodePrimitive (ASN1Header Universal 0x8 _ _) _   = Left $ TypeNotImplemented "External"
-decodePrimitive (ASN1Header Universal 0x9 _ _) _   = Left $ TypeNotImplemented "real"
+decodePrimitive (ASN1Header Universal 0x9 _ _) p   = getDouble p
 decodePrimitive (ASN1Header Universal 0xa _ _) p   = getEnumerated p
 decodePrimitive (ASN1Header Universal 0xb _ _) _   = Left $ TypeNotImplemented "EMBEDDED PDV"
 decodePrimitive (ASN1Header Universal 0xc _ _) p   = getCharacterString UTF8 p
@@ -218,6 +227,50 @@ getIntegerRaw typestr s
         where
             v1 = s `B.index` 0
             v2 = s `B.index` 1
+
+getDouble :: ByteString -> Either ASN1Error ASN1
+getDouble s = Real <$> getDoubleRaw s
+
+getDoubleRaw :: ByteString -> Either ASN1Error Double
+getDoubleRaw s
+  | B.null s  = Right 0
+getDoubleRaw s@(B.unsafeHead -> h)
+  | h == 0x40 = Right $! (1/0)  -- Infinity
+  | h == 0x41 = Right $! (-1/0) -- -Infinity
+  | h == 0x42 = Right $! (0/0)  -- NaN
+  | otherwise = do
+      let len = B.length s
+      base <- case (h `testBit` 5, h `testBit` 4) of
+                -- extract bits 5,4 for the base
+                (False, False) -> return 2
+                (False, True)  -> return 8
+                (True,  False) -> return 16
+                _              -> Left . TypeDecodingFailed $ "real: invalid base detected"
+      -- check bit 6 for the sign
+      let mkSigned = if h `testBit` 6 then negate else id
+      -- extract bits 3,2 for the scaling factor
+      let scaleFactor = (h .&. 0x0c) `shiftR` 2
+      expLength <- getExponentLength len h s
+      -- 1 byte for the header, expLength for the exponent, and at least 1 byte for the mantissa
+      unless (len > 1 + fromIntegral expLength) $
+        Left . TypeDecodingFailed $ "real: not enough input for exponent and mantissa"
+      let (_, exp'') = intOfBytes $ B.unsafeTake (fromIntegral expLength) $ B.unsafeDrop 1 s
+      let exp' = case base :: Int of
+                   2 -> exp''
+                   8 -> 3 * exp''
+                   _ -> 4 * exp'' -- must be 16
+          exponent = exp' - fromIntegral scaleFactor
+          -- whatever is leftover is the mantissa, unsigned
+          (_, mantissa) = uintOfBytes $ B.unsafeDrop (1 + fromIntegral expLength) s
+      Right $! encodeFloat (mkSigned $ toInteger mantissa) (fromIntegral exponent)
+
+getExponentLength :: Int -> Word8 -> ByteString -> Either ASN1Error Word8
+getExponentLength len h s =
+  case h .&. 0x03 of
+    l | l == 0x03 -> do
+          unless (len > 1) $ Left . TypeDecodingFailed $ "real: not enough input to decode exponent length"
+          return $ B.unsafeIndex s 1
+      | otherwise -> return $ l + 1
 
 getBitString :: ByteString -> Either ASN1Error ASN1
 getBitString s =
@@ -362,3 +415,66 @@ putOID oids = case oids of
   where
         encode x | x == 0    = B.singleton 0
                  | otherwise = putVarEncodingIntegral x
+
+putDouble :: Double -> ByteString
+putDouble d
+  | d == 0 = B.pack []
+  | d == (1/0) = B.pack [0x40]
+  | d == negate (1/0) = B.pack [0x41]
+  | isNaN d = B.pack [0x42]
+  | otherwise = LB.toStrict . Builder.toLazyByteString
+              $ Builder.word8 (header .|. (expLen - 1)) -- encode length of exponent
+             <> putExponent
+             <> putMantissa
+  where
+  (mkUnsigned, header)
+    | d < 0     = (negate, bINARY_NEGATIVE_NUMBER_ID)
+    | otherwise = (id, bINARY_POSITIVE_NUMBER_ID)
+  (man, exp) = decodeFloat d
+  (mantissa, exponent) = normalize (fromIntegral $ mkUnsigned man, exp)
+  (expLen, putExponent) = putInt64be (fromIntegral exponent)
+  (_, putMantissa) = putWord64be (mantissa)
+
+-- | Normalize the mantissa and adjust the exponent.
+--
+-- DER requires the mantissa to either be 0 or odd, so we right-shift it
+-- until the LSB is 1, and then add the shift amount to the exponent.
+--
+-- TODO: handle denormal numbers
+normalize :: (Word64, Int) -> (Word64, Int)
+normalize (mantissa, exponent) = (mantissa `shiftR` sh, exponent + sh)
+  where
+    sh = countTrailingZeros mantissa
+
+putInt64be :: Int64 -> (Word8, Builder)
+putInt64be i = (bytesNeeded, putShortWord64be bytesNeeded (fromIntegral i))
+  where
+  bytesNeeded = fromIntegral
+              $ 8 - (countLeadingZeros (if i < 0 then negate i else i) `div` 8)
+
+putWord64be :: Word64 -> (Word8, Builder)
+putWord64be w = (bytesNeeded, putShortWord64be bytesNeeded w)
+  where
+  bytesNeeded = fromIntegral
+              $ 8 - (countLeadingZeros w `div` 8)
+
+putShortWord64be :: Word8 -> Word64 -> Builder
+putShortWord64be bytesNeeded w
+    | bytesNeeded == 0 = Builder.word8 (fromIntegral w)
+    | bytesNeeded == 1 = Builder.word8 (fromIntegral w)
+    | bytesNeeded == 2 = Builder.word16BE (fromIntegral w)
+    | bytesNeeded == 3 = Builder.word8 (fromIntegral (w `shiftR` 16))
+                      <> Builder.word16BE (fromIntegral w)
+    | bytesNeeded == 4 = Builder.word32BE (fromIntegral w)
+    | bytesNeeded == 5 = Builder.word8 (fromIntegral (w `shiftR` 32))
+                      <> Builder.word32BE (fromIntegral w)
+    | bytesNeeded == 6 = Builder.word16BE (fromIntegral (w `shiftR` 32))
+                      <> Builder.word32BE (fromIntegral w)
+    | bytesNeeded == 7 = Builder.word8 (fromIntegral (w `shiftR` 48))
+                      <> Builder.word16BE (fromIntegral (w `shiftR` 32))
+                      <> Builder.word32BE (fromIntegral w)
+    | otherwise        = Builder.word64BE (fromIntegral w)
+
+bINARY_POSITIVE_NUMBER_ID, bINARY_NEGATIVE_NUMBER_ID :: Word8
+bINARY_POSITIVE_NUMBER_ID = 0x80
+bINARY_NEGATIVE_NUMBER_ID = 0xc0
