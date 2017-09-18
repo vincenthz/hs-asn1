@@ -229,16 +229,17 @@ getIntegerRaw typestr s
             v2 = s `B.index` 1
 
 getDouble :: ByteString -> Either ASN1Error ASN1
-{-# INLINE getDouble #-}
-getDouble s = Real <$> getDoubleRaw (B.length s) s
+getDouble s = Real <$> getDoubleRaw s
 
-getDoubleRaw :: Int -> ByteString -> Either ASN1Error Double
-getDoubleRaw 0 _ = Right 0
-getDoubleRaw len s@(B.unsafeHead -> h)
+getDoubleRaw :: ByteString -> Either ASN1Error Double
+getDoubleRaw s
+  | B.null s  = Right 0
+getDoubleRaw s@(B.unsafeHead -> h)
   | h == 0x40 = Right $! (1/0)  -- Infinity
   | h == 0x41 = Right $! (-1/0) -- -Infinity
   | h == 0x42 = Right $! (0/0)  -- NaN
   | otherwise = do
+      let len = B.length s
       base <- case (h `testBit` 5, h `testBit` 4) of
                 -- extract bits 5,4 for the base
                 (False, False) -> return 2
