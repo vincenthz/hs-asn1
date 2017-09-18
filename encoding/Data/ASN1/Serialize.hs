@@ -5,6 +5,7 @@
 -- Stability   : experimental
 -- Portability : unknown
 --
+{-# Language ScopedTypeVariables #-}
 module Data.ASN1.Serialize (getHeader, putHeader) where
 
 import qualified Data.ByteString as B
@@ -59,8 +60,13 @@ getLength = do
         then case clearBit l1 7 of
             0   -> return LenIndefinite
             len -> do
-                lw <- getBytes len
-                return (LenLong len $ uintbs lw)
+                let maxBytes' :: Double =
+                      logBase 2 (fromIntegral (maxBound :: Int)) / 8
+                    maxBytes :: Int = floor maxBytes'
+                if len <= maxBytes
+                  then do lw <- getBytes len
+                          return $ LenLong len $ uintbs lw
+                  else fail "invalid length - would overflow"
         else
             return (LenShort l1)
   where
