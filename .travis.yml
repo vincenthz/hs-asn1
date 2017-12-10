@@ -12,9 +12,6 @@ cache:
 # cabal-install, and BUILD=stack which uses Stack.
 matrix:
   include:
-  - env: BUILD=hlint
-    language: generic
-    compiler: hlint
   - env: BUILD=stack RESOLVER=ghc-8.0
     language: generic
     addons: { apt: { packages: [ libgmp-dev ] } }
