@@ -1,0 +1,85 @@
+# Use new container infrastructure to enable caching
+sudo: false
+
+# Caching so the next build will be fast too.
+cache:
+  directories:
+  - $HOME/.ghc
+  - $HOME/.cabal
+  - $HOME/.stack
+
+# The different configurations we want to test. We have BUILD=cabal which uses
+# cabal-install, and BUILD=stack which uses Stack.
+matrix:
+  include:
+  - env: BUILD=hlint
+    language: generic
+    compiler: hlint
+  - env: BUILD=stack RESOLVER=ghc-8.0
+    language: generic
+    addons: { apt: { packages: [ libgmp-dev ] } }
+    compiler: ghc-8.0
+  - env: BUILD=stack RESOLVER=ghc-8.2
+    language: generic
+    compiler: ghc-8.2
+    addons: { apt: { packages: [ libgmp-dev ] } }
+  - env: BUILD=stack RESOLVER=ghc-7.10
+    language: generic
+    addons: { apt: { packages: [ libgmp-dev ] } }
+    compiler: ghc-7.10
+  - env: BUILD=stack RESOLVER=ghc-7.8
+    language: generic
+    addons: { apt: { packages: [ libgmp-dev ] } }
+    compiler: ghc-7.8
+  - env: BUILD=stack RESOLVER=ghc-8.0
+    os: osx
+    language: generic
+    compiler: ghc-8.0
+
+install:
+  - export PATH=$HOME/.local/bin::$HOME/.cabal/bin:$PATH
+  - mkdir -p ~/.local/bin
+  - |
+    case "$BUILD" in
+      stack)
+        if [ `uname` = "Darwin" ]
+        then
+          travis_retry curl --insecure -L https://www.stackage.org/stack/osx-x86_64 | tar xz --strip-components=1 --include '*/stack' -C ~/.local/bin
+        else
+          travis_retry curl -L https://www.stackage.org/stack/linux-x86_64 | tar xz --wildcards --strip-components=1 -C ~/.local/bin '*/stack'
+        fi
+      ;;
+    cabal)
+      ;;
+    esac
+
+script:
+- |
+  set -ex
+  if [ "x${RUNTEST}" = "xfalse" ]; then exit 0; fi
+  case "$BUILD" in
+    stack)
+      rm stack.yaml && ln -sv .travis/stack-${RESOLVER}.yaml stack.yaml
+      stack --no-terminal test \
+          --flag foundation:bounds-check ${EXPERIMENTAL} \
+          --install-ghc \
+          --coverage --bench --no-run-benchmarks \
+          --haddock --no-haddock-deps
+      ;;
+    cabal)
+      cabal install --only-dependencies --enable-tests
+      cabal test
+      cabal check
+      cabal sdist
+      ;;
+    hlint)
+      curl -sL https://raw.github.com/ndmitchell/hlint/master/misc/travis.sh | sh -s . --cpp-define=__GLASGOW_HASKELL__=800 --cpp-define=x86_64_HOST_ARCH=1 --cpp-define=mingw32_HOST_OS=1
+      ;;
+  esac
+  set +ex
+
+# It doesn't seem to be working so far.
+#
+#after_script:
+#    - travis_retry curl -L https://github.com/rubik/stack-hpc-coveralls/releases/download/v0.0.3.0/shc-linux-x64-$GHCVER.tar.bz2 | tar -xj
+#    - ./shc foundation test-foundation
