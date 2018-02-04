@@ -52,19 +52,14 @@ import Data.ASN1.Error
 import Data.ASN1.Serialize
 import Data.Bits
 import Data.Monoid
-import Data.Int
 import Data.Word
 import Data.List (unfoldr)
 import Data.ByteString (ByteString)
-import Data.ByteString.Builder (Builder)
 import Data.Char (ord, isDigit)
 import qualified Data.ByteString as B
-import qualified Data.ByteString.Builder as Builder
 import qualified Data.ByteString.Char8 as BC
-import qualified Data.ByteString.Lazy as LB
 import qualified Data.ByteString.Unsafe as B
 import Data.Hourglass
-import Control.Applicative
 import Control.Arrow (first)
 import Control.Monad
 
@@ -422,18 +417,17 @@ putDouble d
   | d == (1/0) = B.pack [0x40]
   | d == negate (1/0) = B.pack [0x41]
   | isNaN d = B.pack [0x42]
-  | otherwise = LB.toStrict . Builder.toLazyByteString
-              $ Builder.word8 (header .|. (expLen - 1)) -- encode length of exponent
-             <> putExponent
-             <> putMantissa
+  | otherwise = B.cons (header .|. (expLen - 1)) -- encode length of exponent
+                (expBS <> manBS)
   where
   (mkUnsigned, header)
     | d < 0     = (negate, bINARY_NEGATIVE_NUMBER_ID)
     | otherwise = (id, bINARY_POSITIVE_NUMBER_ID)
   (man, exp) = decodeFloat d
   (mantissa, exponent) = normalize (fromIntegral $ mkUnsigned man, exp)
-  (expLen, putExponent) = putInt64be (fromIntegral exponent)
-  (_, putMantissa) = putWord64be (mantissa)
+  expBS = putInteger (fromIntegral exponent)
+  expLen = fromIntegral (B.length expBS)
+  manBS = putInteger (fromIntegral mantissa)
 
 -- | Normalize the mantissa and adjust the exponent.
 --
@@ -445,35 +439,6 @@ normalize :: (Word64, Int) -> (Word64, Int)
 normalize (mantissa, exponent) = (mantissa `shiftR` sh, exponent + sh)
   where
     sh = countTrailingZeros mantissa
-
-putInt64be :: Int64 -> (Word8, Builder)
-putInt64be i = (bytesNeeded, putShortWord64be bytesNeeded (fromIntegral i))
-  where
-  bytesNeeded = fromIntegral
-              $ 8 - (countLeadingZeros (if i < 0 then negate i else i) `div` 8)
-
-putWord64be :: Word64 -> (Word8, Builder)
-putWord64be w = (bytesNeeded, putShortWord64be bytesNeeded w)
-  where
-  bytesNeeded = fromIntegral
-              $ 8 - (countLeadingZeros w `div` 8)
-
-putShortWord64be :: Word8 -> Word64 -> Builder
-putShortWord64be bytesNeeded w
-    | bytesNeeded == 0 = Builder.word8 (fromIntegral w)
-    | bytesNeeded == 1 = Builder.word8 (fromIntegral w)
-    | bytesNeeded == 2 = Builder.word16BE (fromIntegral w)
-    | bytesNeeded == 3 = Builder.word8 (fromIntegral (w `shiftR` 16))
-                      <> Builder.word16BE (fromIntegral w)
-    | bytesNeeded == 4 = Builder.word32BE (fromIntegral w)
-    | bytesNeeded == 5 = Builder.word8 (fromIntegral (w `shiftR` 32))
-                      <> Builder.word32BE (fromIntegral w)
-    | bytesNeeded == 6 = Builder.word16BE (fromIntegral (w `shiftR` 32))
-                      <> Builder.word32BE (fromIntegral w)
-    | bytesNeeded == 7 = Builder.word8 (fromIntegral (w `shiftR` 48))
-                      <> Builder.word16BE (fromIntegral (w `shiftR` 32))
-                      <> Builder.word32BE (fromIntegral w)
-    | otherwise        = Builder.word64BE (fromIntegral w)
 
 bINARY_POSITIVE_NUMBER_ID, bINARY_NEGATIVE_NUMBER_ID :: Word8
 bINARY_POSITIVE_NUMBER_ID = 0x80

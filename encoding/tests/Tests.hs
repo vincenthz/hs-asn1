@@ -192,7 +192,21 @@ prop_header_marshalling_id v = (ofDone $ runGet getHeader $ putHeader v) == Righ
 prop_event_marshalling_id :: ASN1Events -> Bool
 prop_event_marshalling_id (ASN1Events e) = (parseLBS $ toLazyByteString e) == Right e
 
+prop_asn1_der_marshalling_id :: [ASN1] -> Bool
 prop_asn1_der_marshalling_id v = (decodeASN1 DER . encodeASN1 DER) v `assertEq` Right v
+    where assertEq got expected
+                 | got /= expected = error ("got: " ++ show got ++ " expected: " ++ show expected)
+                 | otherwise       = True
+
+prop_real_der_marshalling_id :: Double -> Bool
+prop_real_der_marshalling_id v = (decodeASN1 DER . encodeASN1 DER) [Real v] `assertEq` Right [Real v]
+    where assertEq got expected
+                 | got /= expected = error ("got: " ++ show got ++ " expected: " ++ show expected)
+                 | otherwise       = True
+
+prop_integral_real_der_marshalling_id :: Integer -> Bool
+prop_integral_real_der_marshalling_id v = (decodeASN1 DER . encodeASN1 DER) [Real (fromInteger v)]
+                                          `assertEq` Right [Real (fromInteger v)]
     where assertEq got expected
                  | got /= expected = error ("got: " ++ show got ++ " expected: " ++ show expected)
                  | otherwise       = True
@@ -201,6 +215,8 @@ marshallingTests = testGroup "Marshalling"
     [ testProperty "Header" prop_header_marshalling_id
     , testProperty "Event"  prop_event_marshalling_id
     , testProperty "DER"    prop_asn1_der_marshalling_id
+    , testProperty "Real"   prop_real_der_marshalling_id
+    , testProperty "Integral Real"   prop_integral_real_der_marshalling_id
     ]
 
 main = defaultMain $ testGroup "asn1-encoding" [marshallingTests]
