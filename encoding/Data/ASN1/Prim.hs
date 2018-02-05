@@ -8,6 +8,7 @@
 -- Tools to read ASN1 primitive (e.g. boolean, int)
 --
 
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE ViewPatterns #-}
 module Data.ASN1.Prim
     (
@@ -61,6 +62,7 @@ import qualified Data.ByteString.Char8 as BC
 import qualified Data.ByteString.Unsafe as B
 import Data.Hourglass
 import Control.Arrow (first)
+import Control.Applicative
 import Control.Monad
 
 encodeHeader :: Bool -> ASN1Length -> ASN1 -> ASN1Header
@@ -439,6 +441,16 @@ normalize :: (Word64, Int) -> (Word64, Int)
 normalize (mantissa, exponent) = (mantissa `shiftR` sh, exponent + sh)
   where
     sh = countTrailingZeros mantissa
+
+#if !(MIN_VERSION_base(4,8,0))
+    countTrailingZeros :: FiniteBits b => b -> Int
+    countTrailingZeros x = go 0
+      where
+        go i | i >= w      = i
+             | testBit x i = i
+             | otherwise   = go (i+1)
+        w = finiteBitSize x
+#endif
 
 bINARY_POSITIVE_NUMBER_ID, bINARY_NEGATIVE_NUMBER_ID :: Word8
 bINARY_POSITIVE_NUMBER_ID = 0x80
