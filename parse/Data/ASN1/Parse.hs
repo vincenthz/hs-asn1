@@ -7,6 +7,7 @@
 --
 -- A parser combinator for ASN1 Stream.
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE CPP #-}
 module Data.ASN1.Parse
     ( ParseASN1
     -- * run
@@ -30,6 +31,9 @@ import Data.ASN1.Stream
 import Control.Applicative
 import Control.Arrow (first)
 import Control.Monad (liftM2)
+#if MIN_VERSION_base(4,9,0)
+import Control.Monad.Fail
+#endif
 
 newtype ParseASN1 a = P { runP :: [ASN1] -> Either String (a, [ASN1]) }
 
@@ -50,6 +54,16 @@ instance Monad ParseASN1 where
         case runP m1 s of
             Left err      -> Left err
             Right (a, s2) -> runP (m2 a) s2
+instance Alternative ParseASN1 where
+    empty = P $ \_ -> Left "empty Alternative"
+    (<|>) m1 m2 = P $ \s ->
+        case runP m1 s of
+            Left _        -> runP m2 s
+            Right (a, s2) -> Right (a, s2)
+#if MIN_VERSION_base(4,9,0)
+instance MonadFail ParseASN1 where
+    fail = throwParseError
+#endif
 
 get :: ParseASN1 [ASN1]
 get = P $ \stream -> Right (stream, stream)

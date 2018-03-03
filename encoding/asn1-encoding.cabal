@@ -1,5 +1,5 @@
 Name:                asn1-encoding
-Version:             0.9.5
+Version:             0.9.6
 Synopsis:            ASN1 data reader and writer in RAW, BER and DER forms
 Description:
     ASN1 data reader and writer in raw form with supports for high level forms of ASN1 (BER, and DER).
@@ -21,8 +21,8 @@ Library
                      Data.ASN1.Encoding
                      Data.ASN1.Stream
                      Data.ASN1.Object
-  other-modules:     Data.ASN1.Prim
-                     Data.ASN1.BinaryEncoding.Parse
+                     Data.ASN1.Prim
+  other-modules:     Data.ASN1.BinaryEncoding.Parse
                      Data.ASN1.BinaryEncoding.Writer
                      Data.ASN1.Internal
                      Data.ASN1.Serialize
