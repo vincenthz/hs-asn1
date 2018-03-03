@@ -1,5 +1,5 @@
 Name:                asn1-encoding
-Version:             0.9.6
+Version:             0.9.5
 Synopsis:            ASN1 data reader and writer in RAW, BER and DER forms
 Description:
     ASN1 data reader and writer in raw form with supports for high level forms of ASN1 (BER, and DER).
