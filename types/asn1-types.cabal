@@ -11,7 +11,7 @@ Build-Type:          Simple
 Category:            Data
 stability:           experimental
 Cabal-Version:       >=1.6
-Homepage:            http://github.com/vincenthz/hs-asn1-types
+Homepage:            http://github.com/vincenthz/hs-asn1
 
 Library
   Build-Depends:     base >= 3 && < 5
@@ -29,4 +29,4 @@ Library
 
 source-repository head
   type:     git
-  location: git://github.com/vincenthz/hs-asn1-types
+  location: git://github.com/vincenthz/hs-asn1
