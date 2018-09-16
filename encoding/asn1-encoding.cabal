@@ -21,8 +21,8 @@ Library
                      Data.ASN1.Encoding
                      Data.ASN1.Stream
                      Data.ASN1.Object
-  other-modules:     Data.ASN1.Prim
-                     Data.ASN1.BinaryEncoding.Parse
+                     Data.ASN1.Prim
+  other-modules:     Data.ASN1.BinaryEncoding.Parse
                      Data.ASN1.BinaryEncoding.Writer
                      Data.ASN1.Internal
                      Data.ASN1.Serialize
