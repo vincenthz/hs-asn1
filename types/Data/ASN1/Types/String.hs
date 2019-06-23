@@ -148,18 +148,23 @@ encodeBMP s = B.pack $ concatMap (toUCS2 . fromEnum) s
                   b1 = fromIntegral (v .&. 0xff)
 
 decodeUTF32 :: ByteString -> String
-decodeUTF32 b
-    | (B.length b `mod` 4) /= 0 = error "not a valid UTF32 string"
-    | otherwise                 = fromUTF32 $ B.unpack b
-  where fromUTF32 (a:b:c:d:l) =
-            let v :: Word32
-                v = (fromIntegral a `shiftL` 24) .|.
-                    (fromIntegral b `shiftL` 16) .|.
-                    (fromIntegral c `shiftL` 8) .|.
-                    (fromIntegral d)
-             in toEnum (fromIntegral v) : fromUTF32 l
-        fromUTF32 [] = []
-        fromUTF32 _  = error "decodeUTF32: internal error"
+decodeUTF32 bs
+    | (B.length bs `mod` 4) /= 0 = error "not a valid UTF32 string"
+    | otherwise                  = fromUTF32 0
+  where w32ToChar :: Word32 -> Char
+        w32ToChar = toEnum . fromIntegral
+        fromUTF32 ofs
+            | ofs == B.length bs = []
+            | otherwise =
+                let a = B.index bs ofs
+                    b = B.index bs (ofs+1)
+                    c = B.index bs (ofs+2)
+                    d = B.index bs (ofs+3)
+                    v = (fromIntegral a `shiftL` 24) .|.
+                        (fromIntegral b `shiftL` 16) .|.
+                        (fromIntegral c `shiftL` 8) .|.
+                        (fromIntegral d)
+                 in w32ToChar v : fromUTF32 (ofs+4)
 encodeUTF32 :: String -> ByteString
 encodeUTF32 s = B.pack $ concatMap (toUTF32 . fromEnum) s
   where toUTF32 v = [b0,b1,b2,b3]
