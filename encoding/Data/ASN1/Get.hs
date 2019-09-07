@@ -15,6 +15,7 @@
 -- The original code has been tailored and reduced to only cover the useful
 -- case for asn1 and augmented by a position.
 --
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE Rank2Types #-}
 module Data.ASN1.Get
     ( Result(..)
@@ -29,6 +30,9 @@ module Data.ASN1.Get
 
 import Control.Applicative (Applicative(..),Alternative(..))
 import Control.Monad (ap,MonadPlus(..))
+#if MIN_VERSION_base(4,9,0)
+import qualified Control.Monad.Fail as Fail
+#endif
 import Data.Maybe (fromMaybe)
 import Foreign
 
@@ -103,7 +107,14 @@ instance Monad Get where
         let ks' s1 b1 m1 p1 a = unGet (g a) s1 b1 m1 p1 kf ks
          in unGet m s0 b0 m0 p0 kf ks'
 
+#if !MIN_VERSION_base(4,13,0)
     fail     = failDesc
+#endif
+
+#if MIN_VERSION_base(4,9,0)
+instance Fail.MonadFail Get where
+    fail     = failDesc
+#endif
 
 instance MonadPlus Get where
     mzero     = failDesc "mzero"
