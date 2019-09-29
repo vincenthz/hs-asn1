@@ -3,12 +3,14 @@ compiler: ghc-8.0 lts-9.21
 compiler: ghc-8.2 lts-10.4
 compiler: ghc-8.4 lts-12.26
 compiler: ghc-8.6 lts-13.26
+compiler: ghc-8.8 nightly-2019-09-29
 
 # builds 
 build: ghc-8.0
 build: ghc-8.2
 build: ghc-8.4
-build: ghc-8.6 os=linux,osx,win
+build: ghc-8.6
+build: ghc-8.8 os=linux,osx,win
 
 # packages
 package: encoding
