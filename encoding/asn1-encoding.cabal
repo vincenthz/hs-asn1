@@ -1,5 +1,5 @@
 Name:                asn1-encoding
-Version:             0.9.5
+Version:             0.9.6
 Synopsis:            ASN1 data reader and writer in RAW, BER and DER forms
 Description:
     ASN1 data reader and writer in raw form with supports for high level forms of ASN1 (BER, and DER).
@@ -12,7 +12,7 @@ Category:            Data
 stability:           experimental
 Build-Type:          Simple
 Cabal-Version:       >=1.10
-Homepage:            http://github.com/vincenthz/hs-asn1
+Homepage:            https://github.com/vincenthz/hs-asn1
 
 Library
   Exposed-modules:   Data.ASN1.Error
@@ -51,5 +51,5 @@ Test-Suite tests-asn1-encoding
 
 source-repository head
   type:     git
-  location: git://github.com/vincenthz/hs-asn1
-  subdir:   asn1-encoding
+  location: https://github.com/vincenthz/hs-asn1
+  subdir:   encoding
