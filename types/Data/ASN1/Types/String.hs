@@ -123,7 +123,7 @@ encodeUTF8 s = B.pack $ concatMap (toUTF8 . fromEnum) s
                               , toCont (e `shiftR` 6)
                               , toCont e]
             | otherwise     = error "not a valid value"
-        toCont v = fromIntegral (0xc0 .&. (v .&. 0x3f))
+        toCont v = fromIntegral (0x80 .|. (v .&. 0x3f))
 
 decodeASCII :: ByteString -> String
 decodeASCII = BC.unpack
