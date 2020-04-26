@@ -137,7 +137,9 @@ getNextContainer ty = do
               | otherwise     -> throwParseError "not an expected container"
 
 
--- | run a function of the next elements of a container of specified type
+-- | Run a function of the next elements of a container of specified type.
+-- The function has to handle all the ASN.1 objects of the container,
+-- similarly to when using 'runParseASN1'.
 onNextContainer :: ASN1ConstructionType -> ParseASN1 a -> ParseASN1 a
 onNextContainer ty f = getNextContainer ty >>= either throwParseError return . runParseASN1 f
 
